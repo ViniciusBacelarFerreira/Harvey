@@ -3,104 +3,87 @@ import math
 import pandas as pd
 import datetime
 import os
-import io
-from fpdf import FPDF
-from cryptography.fernet import Fernet
-import base64
-
-# ==========================================
-# CONFIGURAÇÃO DE SEGURANÇA (CRIPTOGRAFIA)
-# ==========================================
-# Chave mestra para criptografia (Em um sistema real, essa chave ficaria em um cofre de senhas)
-# Aqui, geramos uma chave baseada em uma frase fixa para manter a consistência dos arquivos
-def gerar_chave(senha_mestra):
-    hash_senha = base64.urlsafe_b64encode(senha_mestra.ljust(32)[:32].encode())
-    return hash_senha
-
-SENHA_ADMIN = "HUGV2026"  # <--- Altere sua senha aqui
-CHAVE_CRIPTOGRAFIA = gerar_chave("HarveyCushingHUGVManaus")
-fernet = Fernet(CHAVE_CRIPTOGRAFIA)
-
-ARQUIVO_DADOS = "dados_protegidos.dat"
-
-def salvar_dados_criptografados(df):
-    csv_str = df.to_csv(index=False)
-    dados_cripto = fernet.encrypt(csv_str.encode())
-    with open(ARQUIVO_DADOS, "wb") as f:
-        f.write(dados_cripto)
-
-def carregar_dados_descriptografados():
-    if not os.path.exists(ARQUIVO_DADOS):
-        return pd.DataFrame(columns=["Data/Hora", "Prontuário", "Paciente", "Mãe", "Avaliação Clínica", "Resultado (%)", "Classificação", "Tipo"])
-    
-    with open(ARQUIVO_DADOS, "rb") as f:
-        dados_cripto = f.read()
-    
-    try:
-        dados_puro = fernet.decrypt(dados_cripto).decode()
-        return pd.read_csv(io.StringIO(dados_puro), dtype={'Prontuário': str})
-    except:
-        return pd.DataFrame(columns=["Data/Hora", "Prontuário", "Paciente", "Mãe", "Avaliação Clínica", "Resultado (%)", "Classificação", "Tipo"])
 
 # ==========================================
 # CONFIGURAÇÃO INICIAL E ESTADO DA SESSÃO
 # ==========================================
 st.set_page_config(page_title="NeuroPreditor Harvey", layout="wide", page_icon="🧠")
 
-if 'autenticado' not in st.session_state:
-    st.session_state.autenticado = False
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 if 'ultimo_resultado' not in st.session_state:
     st.session_state.ultimo_resultado = None
 
+ARQUIVO_CSV = "registro_pacientes.csv"
+
 # ==========================================
-# TELA DE LOGIN (LGPD)
+# LÓGICA DE APOIO À DECISÃO (TRAFFIC LIGHT)
 # ==========================================
-if not st.session_state.autenticado:
-    st.markdown("<h1 class='main-title'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;'>Acesso Restrito - Unidade de Neurocirurgia HUGV/UFAM</p>", unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.markdown("<div class='input-card'>", unsafe_allow_html=True)
-            senha_input = st.text_input("Digite a senha de acesso:", type="password")
-            if st.button("Entrar no Sistema"):
-                if senha_input == SENHA_ADMIN:
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("Senha incorreta. Acesso negado.")
-            st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+def obter_conduta_sugerida(modulo, prob, tipo):
+    if modulo == "Prognóstico Visual":
+        if prob >= 60: return "green", "Ótimo prognóstico. Manter plano cirúrgico e alinhar alta expectativa de recuperação visual."
+        elif prob >= 30: return "yellow", "Prognóstico moderado. Alinhar com o paciente que a recuperação pode ser parcial ou lenta."
+        else: return "red", "Baixa probabilidade de melhora. Alinhamento rigoroso de expectativas no pré-op."
+    elif modulo == "Recorrência Cushing":
+        if prob < 20: return "green", "Baixo risco de recorrência. Seguir protocolo padrão de seguimento."
+        elif prob < 45: return "yellow", "Risco moderado. Vigilância apertada de cortisol urinário/salivar no 1º ano."
+        else: return "red", "Alto risco. Considerar RM precoce e avaliação multidisciplinar para terapias adjuvantes."
+    elif modulo == "Risco Fístula LCR":
+        if prob < 10: return "green", "Baixo risco. Técnica de fechamento padrão costuma ser suficiente."
+        elif prob < 20: return "yellow", "Risco moderado. Reforçar reconstrução e considerar repouso absoluto."
+        else: return "red", "ALTO RISCO. Considerar Flap Nasoseptal e avaliação de Dreno Lombar profilático."
+    elif modulo == "Diabetes Insipidus":
+        if prob < 15: return "green", "Baixo risco. Monitorização padrão de balanço hídrico."
+        elif prob < 35: return "yellow", "Risco moderado. Vigilância estrita de densidade urinária e eletrólitos."
+        else: return "red", "Alto risco. Protocolo rigoroso; ter Desmopressina (DDAVP) disponível."
+    elif "DPH" in modulo:
+        if prob < 15: return "green", "Baixo risco. Alta segura com orientações padrão."
+        elif prob < 30: return "yellow", "Risco moderado. Orientar restrição hídrica leve e sódio no 7º POD."
+        else: return "red", "ALTO RISCO. Adiar alta ou garantir coleta de sódio em 48h; orientar sinais de alerta."
+    elif modulo == "Risco Meningite":
+        if prob < 5: return "green", "Baixo risco de infecção. Manter profilaxia antibiótica padrão."
+        elif prob < 15: return "yellow", "Risco moderado. Monitorar rigorosamente febre, rigidez nucal e cefaleia. Avaliar PCR basal."
+        else: return "red", "ALTO RISCO. Manter vigilância neurológica estrita; baixa limiar para punção lombar se sintomas sugestivos."
+    return "gray", ""
 
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
 def risco_pdh_cai_2023(teve_hiponatremia_pod1_2, monocitos_perc, pt_segundos):
-    beta_hypo, beta_mono, beta_pt, beta_0 = 0.97, 0.20, 0.58, -12.50 
+    beta_hypo, beta_mono, beta_pt = 0.97, 0.20, 0.58
+    beta_0 = -12.50 
     x_hypo = 1 if teve_hiponatremia_pod1_2 else 0
     logit = beta_0 + (beta_hypo * x_hypo) + (beta_mono * monocitos_perc) + (beta_pt * pt_segundos)
     return (1 / (1 + math.exp(-logit))) * 100
 
 def risco_pdh_tan_2025(prl_pre_op, elevacao_diafragma_mm, teve_hiponatremia_d1_d2):
-    beta_prl, beta_elevacao, beta_hipo_precoce, beta_0 = 0.00995, 0.501, 3.486, -7.50 
+    beta_prl, beta_elevacao, beta_hipo_precoce = 0.00995, 0.501, 3.486
+    beta_0 = -7.50 
     x_hipo_precoce = 1 if teve_hiponatremia_d1_d2 else 0
     logit = beta_0 + (beta_prl * prl_pre_op) + (beta_elevacao * elevacao_diafragma_mm) + (beta_hipo_precoce * x_hipo_precoce)
     return (1 / (1 + math.exp(-logit))) * 100
 
 def risco_fistula_lcr_zhang_2025(kelly_maior_igual_2, suprasselar_maior_igual_B, pneumoencefalo_maior_igual_3, tamanho_janela_ossea_mm):
-    beta_kelly, beta_supra, beta_pneumo, beta_janela, beta_0 = 1.55, 1.77, 2.56, 0.18, -10.00 
-    x_kelly, x_supra, x_pneumo = (1 if kelly_maior_igual_2 else 0), (1 if suprasselar_maior_igual_B else 0), (1 if pneumoencefalo_maior_igual_3 else 0)
+    beta_kelly, beta_supra, beta_pneumo, beta_janela = 1.55, 1.77, 2.56, 0.18
+    beta_0 = -10.00 
+    x_kelly = 1 if kelly_maior_igual_2 else 0
+    x_supra = 1 if suprasselar_maior_igual_B else 0
+    x_pneumo = 1 if pneumoencefalo_maior_igual_3 else 0
     logit = beta_0 + (beta_kelly * x_kelly) + (beta_supra * x_supra) + (beta_pneumo * x_pneumo) + (beta_janela * tamanho_janela_ossea_mm)
     return (1 / (1 + math.exp(-logit))) * 100
 
 def risco_diabetes_insipidus_li_2024(tem_diabetes, tem_hipertensao, tem_cardiopatia, cortisol_pre_op, teve_fistula_pos_op, textura_tumor_rigida):
     beta_diabetes, beta_hipertensao, beta_cardiopatia = 0.845, 0.672, 1.039
-    beta_cortisol, beta_fistula, beta_textura, beta_0 = 0.001, 1.121, 0.776, -6.50 
-    x_d, x_h, x_c, x_f, x_t = (1 if tem_diabetes else 0), (1 if tem_hipertensao else 0), (1 if tem_cardiopatia else 0), (1 if teve_fistula_pos_op else 0), (1 if textura_tumor_rigida else 0)
-    logit = beta_0 + (beta_diabetes * x_d) + (beta_hipertensao * x_h) + (beta_cardiopatia * x_c) + (beta_cortisol * cortisol_pre_op) + (beta_fistula * x_f) + (beta_textura * x_t)
+    beta_cortisol, beta_fistula, beta_textura = 0.001, 1.121, 0.776
+    beta_0 = -6.50 
+    x_diabetes = 1 if tem_diabetes else 0
+    x_hipertensao = 1 if tem_hipertensao else 0
+    x_cardiopatia = 1 if tem_cardiopatia else 0
+    x_fistula = 1 if teve_fistula_pos_op else 0
+    x_textura = 1 if textura_tumor_rigida else 0
+    logit = beta_0 + (beta_diabetes * x_diabetes) + (beta_hipertensao * x_hipertensao) + \
+            (beta_cardiopatia * x_cardiopatia) + (beta_cortisol * cortisol_pre_op) + \
+            (beta_fistula * x_fistula) + (beta_textura * x_textura)
     return (1 / (1 + math.exp(-logit))) * 100
 
 def risco_melhora_visual_ji_2023(compressao_quiasma, defeito_difuso, duracao_sintomas_meses, md_pre_operatorio):
@@ -109,13 +92,20 @@ def risco_melhora_visual_ji_2023(compressao_quiasma, defeito_difuso, duracao_sin
     if defeito_difuso: pontos_totais += 20
     pontos_totais += max(0, 100 - (2.5 * duracao_sintomas_meses))
     pontos_totais += max(0, (md_pre_operatorio - 2) * (20.0 / 14.0))
-    return min(95.0, max(5.0, (pontos_totais / 103.0) * 33.0))
+    probabilidade = (pontos_totais / 103.0) * 33.0 
+    return min(95.0, max(5.0, probabilidade))
 
 def risco_recorrencia_cushing_cuper_2025(duracao_sintomas_meses, hardy_grade, localizacao_tumor, cirurgia_previa):
-    pontos_totais = (min(240.0, max(0.0, duracao_sintomas_meses)) * (100.0 / 240.0)) + (min(4, max(0, hardy_grade)) * 12.5)
-    loc = local_tumor.lower()
-    pontos_totais += 14 if loc == 'direita' else 18 if loc == 'central' else 22 if loc == 'esquerda' else 33 if loc in ['haste', 'stalk'] else 0
+    pontos_totais = 0
+    pontos_totais += min(240.0, max(0.0, duracao_sintomas_meses)) * (100.0 / 240.0)
+    pontos_totais += min(4, max(0, hardy_grade)) * 12.5
+    loc = localizacao_tumor.lower()
+    if loc == 'direita': pontos_totais += 14
+    elif loc == 'central': pontos_totais += 18
+    elif loc == 'esquerda': pontos_totais += 22
+    elif loc in ['haste', 'stalk']: pontos_totais += 33
     if cirurgia_previa: pontos_totais += 28
+    
     if pontos_totais <= 60: prob = (pontos_totais / 60.0) * 10.0
     elif pontos_totais <= 100: prob = 10.0 + ((pontos_totais - 60.0) / 40.0) * 30.0
     elif pontos_totais <= 120: prob = 40.0 + ((pontos_totais - 100.0) / 20.0) * 25.0
@@ -123,34 +113,58 @@ def risco_recorrencia_cushing_cuper_2025(duracao_sintomas_meses, hardy_grade, lo
     return min(95.0, max(1.0, prob))
 
 def risco_meningite_zhou_2025(duracao_cirurgia_h, diametro_tumor_cm, fistula_intraop):
-    beta_duracao, beta_diametro, beta_fistula, beta_0 = 0.98, 0.99, 2.22, -8.00 
-    x_f = 1 if fistula_intraop else 0
-    logit = beta_0 + (beta_duracao * duracao_cirurgia_h) + (beta_diametro * diametro_tumor_cm) + (beta_fistula * x_f)
+    beta_duracao = 0.98
+    beta_diametro = 0.99
+    beta_fistula = 2.22
+    beta_0 = -8.00 
+    x_fistula = 1 if fistula_intraop else 0
+    logit = beta_0 + (beta_duracao * duracao_cirurgia_h) + (beta_diametro * diametro_tumor_cm) + (beta_fistula * x_fistula)
     return (1 / (1 + math.exp(-logit))) * 100
 
 # ==========================================
-# GESTÃO DE DADOS (LOG LGPD)
+# GESTÃO DE DADOS (SALVAMENTO)
 # ==========================================
 def obter_classificacao(probabilidade, tipo="risco"):
     if tipo == "melhora":
-        return ("Alta Chance", "green") if probabilidade >= 60 else ("Chance Moderada", "orange") if probabilidade >= 30 else ("Baixa Chance", "red")
-    return ("Baixo Risco", "green") if probabilidade < 20 else ("Risco Moderado", "orange") if probabilidade < 45 else ("Alto Risco", "red")
+        if probabilidade >= 60: return "Alta Chance", "green"
+        elif probabilidade >= 30: return "Chance Moderada", "orange"
+        else: return "Baixa Chance", "red"
+    else:
+        if probabilidade < 20: return "Baixo Risco", "green"
+        elif probabilidade < 45: return "Risco Moderado", "orange"
+        else: return "Alto Risco", "red"
 
 def salvar_registro(modulo_analise, probabilidade, tipo="risco"):
-    df = carregar_dados_descriptografados()
+    paciente = st.session_state.paciente_ativo['nome']
+    mae = st.session_state.paciente_ativo['mae']
+    prontuario = str(st.session_state.paciente_ativo['prontuario'])
+    
     classificacao, _ = obter_classificacao(probabilidade, tipo)
     data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     novo_dado = pd.DataFrame([{
-        "Data/Hora": data_hora, "Prontuário": str(st.session_state.paciente_ativo['prontuario']),
-        "Paciente": st.session_state.paciente_ativo['nome'], "Mãe": st.session_state.paciente_ativo['mae'],
-        "Avaliação Clínica": modulo_analise, "Resultado (%)": round(probabilidade, 1),
-        "Classificação": classificacao, "Tipo": tipo
+        "Data/Hora": data_hora,
+        "Prontuário": prontuario,
+        "Paciente": paciente,
+        "Mãe": mae,
+        "Avaliação Clínica": modulo_analise,
+        "Resultado (%)": round(probabilidade, 1),
+        "Classificação": classificacao,
+        "Tipo": tipo
     }])
     
-    df_final = pd.concat([df, novo_dado], ignore_index=True)
-    salvar_dados_criptografados(df_final)
-    return True
+    try:
+        if os.path.exists(ARQUIVO_CSV):
+            df_existente = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+            df_final = pd.concat([df_existente, novo_dado], ignore_index=True)
+        else:
+            df_final = novo_dado
+        
+        df_final.to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar: {e}")
+        return False
 
 # ==========================================
 # ESTILOS CSS
@@ -162,56 +176,92 @@ st.markdown("""
     .harvey-text { font-family: 'Georgia', serif; font-style: italic; background: -webkit-linear-gradient(45deg, #b8860b, #ffd700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: normal; margin-left: 10px; }
     .patient-header { background: linear-gradient(135deg, #0b2e59, #1565c0); color: white; padding: 20px 30px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
     .dashboard-card { background-color: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; border-top: 6px solid #ddd; height: 100%; transition: transform 0.2s; }
+    .dashboard-card:hover { transform: translateY(-5px); }
+    .card-title { color: #555; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; }
     .card-value { font-size: 2.5rem; font-weight: 800; margin: 5px 0; }
+    .card-status { font-weight: bold; font-size: 1rem; margin-bottom: 10px; }
+    .card-date { font-size: 0.75rem; color: #aaa; }
+    
     .b-green { border-top-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
     .b-orange { border-top-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
     .b-red { border-top-color: #c62828 !important; } .t-red { color: #c62828 !important; }
+
     .input-card { background-color: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); margin-top: 15px; border: 1px solid #e0e0e0; }
+    .calc-info { background-color: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 5px solid #1565c0; margin-bottom: 20px; font-size: 0.95rem; color: #0d47a1; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
 # BARRA LATERAL
 # ==========================================
+def deslogar():
+    st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
+    st.session_state.ultimo_resultado = None
+
 with st.sidebar:
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     st.markdown("<h4 style='color: #0b2e59; margin-top: 5px;'>HUGV - UFAM</h4>", unsafe_allow_html=True)
     st.markdown("<h2 style='color: #0b2e59; margin-top: 15px;'>NeuroPreditor <span class='harvey-text'>Harvey</span></h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #888; font-size: 0.8rem;'>Protocolo Seguro LGPD</p></div>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #888; font-size: 0.8rem;'>Made by Vinícius Bacelar Ferreira</p></div>", unsafe_allow_html=True)
     st.markdown("---")
-    nav = st.radio("Menu Principal:", ["🏠 Área de Trabalho", "⚙️ Gerenciar Banco de Dados"])
+    nav = st.radio("Menu Principal:", ["🏠 Área de Trabalho", "⚙️ Histórico Geral"])
     if st.session_state.paciente_ativo['prontuario']:
-        st.markdown("---")
-        st.button("❌ Encerrar Prontuário", on_click=deslogar, type="primary")
+        st.button("❌ Sair do Prontuário", on_click=deslogar, type="primary")
 
 # ==========================================
-# ÁREA DE TRABALHO (ACESSAR/CADASTRAR)
+# HOME PAGE
 # ==========================================
 if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de Trabalho":
     st.markdown("<h1 class='main-title'>NeuroPreditor Transesfenoidal <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-    st.markdown("<div style='max-width: 900px; margin: 0 auto 35px auto; padding: 25px; background:#fff; border-left:6px solid #b8860b; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.06); text-align: center;'><p style='font-size:1.35rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #888;'><em>Made by Vinícius Bacelar Ferreira</em></p>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style='max-width: 900px; margin: 0 auto 35px auto; padding: 25px; background:#fff; border-left:6px solid #b8860b; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.06); text-align: center;'>
+        <p style='font-size:1.35rem; font-style:italic; line-height: 1.6;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p>
+        <p style='color:#b8860b; font-weight:800; letter-spacing: 1px;'>— HARVEY WILLIAMS CUSHING</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
-        df_busca = carregar_dados_descriptografados()
-        if not df_busca.empty:
-            lista_pac = df_busca.drop_duplicates(subset=['Prontuário'])
-            escolha = st.selectbox("Selecione o paciente:", [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in lista_pac.iterrows()])
-            if st.button("Abrir Prontuário") and escolha:
-                bp = escolha.split(" - ")[0]
-                pdf_data = df_busca[df_busca['Prontuário'] == str(bp)]
-                st.session_state.paciente_ativo = {"prontuario": str(bp), "nome": pdf_data.iloc[0]['Paciente'], "mae": pdf_data.iloc[0]['Mãe']}
-                st.rerun()
-        else: st.info("Nenhum paciente no sistema.")
+        
+        # Puxar lista de pacientes do arquivo se existir
+        if os.path.exists(ARQUIVO_CSV):
+            df_busca = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+            if not df_busca.empty:
+                # Remove duplicados para mostrar apenas 1 vez cada paciente na lista
+                lista_prontuarios = df_busca.drop_duplicates(subset=['Prontuário'])
+                opcoes_pacientes = [""] + [f"{row['Prontuário']} - {row['Paciente']}" for _, row in lista_prontuarios.iterrows()]
+                
+                paciente_selecionado = st.selectbox("Selecione um paciente já cadastrado:", opcoes_pacientes)
+                
+                if st.button("Abrir Prontuário"):
+                    if paciente_selecionado != "":
+                        bp = paciente_selecionado.split(" - ")[0]
+                        pdf_data = df_busca[df_busca['Prontuário'] == str(bp)]
+                        if not pdf_data.empty:
+                            st.session_state.paciente_ativo = {"prontuario": str(bp), "nome": pdf_data.iloc[0]['Paciente'], "mae": pdf_data.iloc[0]['Mãe']}
+                            st.rerun()
+                    else:
+                        st.warning("Selecione um paciente na lista acima.")
+            else:
+                st.info("Nenhum paciente cadastrado no banco de dados.")
+        else:
+            st.info("Nenhum paciente cadastrado no banco de dados.")
+            
         st.markdown("</div>", unsafe_allow_html=True)
+        
     with c2:
         st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
-        nn, nm, np = st.text_input("Nome:"), st.text_input("Mãe:"), st.text_input("Nº Prontuário:")
+        nn = st.text_input("Nome do Paciente:")
+        nm = st.text_input("Nome da Mãe:")
+        np = st.text_input("Nº Prontuário:")
         if st.button("Cadastrar Paciente"):
             if nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
+            else: st.warning("Nome e Prontuário são obrigatórios.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
@@ -219,61 +269,266 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
 # ==========================================
 if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuario']:
     st.markdown(f'<div class="patient-header"><div><p style="font-size:0.8rem;opacity:0.8;">PRONTUÁRIO ATIVO</p><h2>👤 {st.session_state.paciente_ativo["nome"]}</h2></div><div><p>Prontuário: {st.session_state.paciente_ativo["prontuario"]}</p></div></div>', unsafe_allow_html=True)
-    tabs = st.tabs(["📊 Painel", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Hiponatremia", "🦠 Meningite"])
+    
+    tabs = st.tabs(["📊 Painel de Resultados", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Hiponatremia", "🦠 Meningite"])
 
-    with tabs[0]: # PAINEL
-        df_pac = carregar_dados_descriptografados()
-        df_pac = df_pac[df_pac['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
-        if not df_pac.empty:
-            df_l = df_pac.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
-            cols = st.columns(3)
-            for i, r in df_l.iterrows():
-                v = float(r['Resultado (%)'])
-                l, c = obter_classificacao(v, r['Tipo'])
-                with cols[i % 3]:
-                    st.markdown(f'<div class="dashboard-card b-{c}"><div style="font-weight:bold;color:#555;">{r["Avaliação Clínica"]}</div><div class="card-value t-{c}">{v}%</div><div style="font-weight:bold;" class="t-{c}">{l}</div><div style="font-size:0.7rem;color:#aaa;">{r["Data/Hora"]}</div></div><br>', unsafe_allow_html=True)
-        else: st.info("Sem cálculos arquivados.")
+    # --- ABA PAINEL (RESUMO) ---
+    with tabs[0]:
+        st.subheader("📊 Últimos Resultados Clínicos")
+        if os.path.exists(ARQUIVO_CSV):
+            df_hist = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+            df_pac = df_hist[df_hist['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
+            
+            if not df_pac.empty:
+                df_latest = df_pac.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
+                
+                cols = st.columns(3)
+                for index, row in df_latest.iterrows():
+                    val = float(row['Resultado (%)'])
+                    tipo = row['Tipo']
+                    label, cor = obter_classificacao(val, tipo)
+                    
+                    c_prefix = "green" if cor == "green" else "orange" if cor == "orange" else "red"
+                    
+                    with cols[index % 3]:
+                        st.markdown(f"""
+                        <div class="dashboard-card b-{c_prefix}">
+                            <div class="card-title">{row['Avaliação Clínica']}</div>
+                            <div class="card-value t-{c_prefix}">{val}%</div>
+                            <div class="card-status t-{c_prefix}">{label}</div>
+                            <div class="card-date">Analisado em: {row['Data/Hora']}</div>
+                        </div>
+                        <br>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Ainda não existem cálculos arquivados para este paciente. Selecione uma aba acima para iniciar.")
+        else:
+            st.info("O banco de dados está vazio.")
 
-    # CALCULADORAS (Simplificadas para manter o código direto)
-    with tabs[1]: # VISÃO
+    # --- ABA VISÃO ---
+    with tabs[1]:
+        st.markdown("<div class='calc-info'><strong>Previsão de Melhora Visual:</strong> Estima a chance de recuperação campimétrica pós-operatória.</div>", unsafe_allow_html=True)
         st.markdown("<div class='input-card'>", unsafe_allow_html=True)
-        v_q, v_d = st.toggle("Compressão quiasma?", help="RM Coronal"), st.toggle("Defeito difuso?")
-        v_m, v_md = st.number_input("Meses sintomas:", 0), st.number_input("MD (dB) pré-op:", 0.0)
-        if st.button("Calcular e Salvar Visão"):
+        c1, c2 = st.columns(2)
+        with c1: 
+            v_q = st.toggle("Compressão do quiasma óptico?", help="Distorção visível na RM coronal.")
+            v_d = st.toggle("Defeito campimétrico difuso?", help="Queda generalizada na campimetria.")
+        with c2: 
+            v_m = st.number_input("Duração dos sintomas (meses):", 0)
+            v_md = st.number_input("MD (dB) pré-op:", 0.0, help="Mean Defect.")
+        
+        if st.button("Calcular e Salvar", key="btn_visao"):
             res = risco_melhora_visual_ji_2023(v_q, v_d, v_m, v_md)
-            st.session_state.ultimo_resultado = {"m": "Prognóstico Visual", "v": res, "t": "melhora"}
-            salvar_registro("Prognóstico Visual", res, "melhora"); st.rerun()
-        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['m'] == "Prognóstico Visual":
-            st.metric("Resultado", f"{st.session_state.ultimo_resultado['v']:.1f}%")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with tabs[3]: # FÍSTULA
-        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
-        f_k, f_s = st.toggle("Kelly ≥ 2?"), st.toggle("Suprasselar ≥ B?")
-        f_p, f_j = st.toggle("Pneumoencéfalo ≥ 3?"), st.number_input("Janela (mm):", 0.0)
-        if st.button("Calcular e Salvar Fístula"):
-            res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
-            st.session_state.ultimo_resultado = {"m": "Risco Fístula LCR", "v": res, "t": "risco"}
-            salvar_registro("Risco Fístula LCR", res, "risco"); st.rerun()
-        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['m'] == "Risco Fístula LCR":
-            st.metric("Risco", f"{st.session_state.ultimo_resultado['v']:.1f}%")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# ==========================================
-# GERENCIAMENTO (ZONA DE EXCLUSÃO)
-# ==========================================
-elif nav == "⚙️ Gerenciar Banco de Dados":
-    st.title("⚙️ Gerenciamento Seguro (LGPD)")
-    df_g = carregar_dados_descriptografados()
-    if not df_g.empty:
-        st.dataframe(df_g, use_container_width=True, hide_index=True)
-        st.markdown("---")
-        lista_del = df_g.drop_duplicates(subset=['Prontuário'])
-        p_del = st.selectbox("Excluir Paciente permanentemente:", [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in lista_del.iterrows()])
-        if st.button("🚨 CONFIRMAR EXCLUSÃO PERMANENTE") and p_del:
-            id_del = p_del.split(" - ")[0]
-            df_nova = df_g[df_g['Prontuário'] != id_del]
-            salvar_dados_criptografados(df_nova)
-            st.success("Dados removidos conforme a LGPD.")
+            st.session_state.ultimo_resultado = {"modulo": "Prognóstico Visual", "valor": res, "tipo": "melhora"}
+            salvar_registro("Prognóstico Visual", res, "melhora")
             st.rerun()
-    else: st.info("Banco de dados vazio.")
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Prognóstico Visual":
+            st.metric("Probabilidade Calculada", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+        
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Ji X, et al. Visual field improvement after endoscopic transsphenoidal surgery in patients with pituitary adenoma. *Front Oncol*. 2023;13:1108883.  
+            **DOI:** [10.3389/fonc.2023.1108883](https://doi.org/10.3389/fonc.2023.1108883)
+            """)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- ABA CUSHING ---
+    with tabs[2]:
+        st.markdown("<div class='calc-info'><strong>Recorrência de Cushing:</strong> Risco de persistência da doença a longo prazo (Modelo CuPeR).</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: 
+            c_dur = st.number_input("Meses de sintomas:", 0, key="c_dur")
+            c_cp = st.toggle("Cirurgia pituitária prévia?")
+        with c2: 
+            c_h = st.select_slider("Grau de Hardy:", [0,1,2,3,4], value=2, help="Classificação radiológica de invasão.")
+            c_l = st.selectbox("Localização:", ["Bilateral","Direita","Esquerda","Central","Haste"])
+        
+        if st.button("Calcular e Salvar", key="btn_cushing"):
+            res = risco_recorrencia_cushing_cuper_2025(c_dur, c_h, c_l, c_cp)
+            st.session_state.ultimo_resultado = {"modulo": "Recorrência Cushing", "valor": res, "tipo": "risco"}
+            salvar_registro("Recorrência Cushing", res, "risco")
+            st.rerun()
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Recorrência Cushing":
+            st.metric("Risco de Recorrência", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+            
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Sharifi G, et al. The CuPeR model: A dynamic online tool for predicting Cushing's disease persistence and recurrence after pituitary surgery. *J Clin Transl Endocrinol*. 2025;41:100417.  
+            **DOI:** [10.1016/j.jcte.2025.100417](https://doi.org/10.1016/j.jcte.2025.100417)
+            """)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- ABA FÍSTULA ---
+    with tabs[3]:
+        st.markdown("<div class='calc-info'><strong>Risco de Fístula LCR:</strong> Avaliação de risco imediato no pós-operatório.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: 
+            f_k = st.toggle("Grau de Kelly intraop. ≥ 2?", help="Fístula moderada/alta na cirurgia.")
+            f_s = st.toggle("Extensão suprasselar ≥ Grau B?")
+        with c2: 
+            f_p = st.toggle("Pneumoencéfalo pós-op ≥ Grau 3?", help="Acentuado na TC.")
+            f_j = st.number_input("Janela óssea (mm):", 0.0)
+        
+        if st.button("Calcular e Salvar", key="btn_fistula"):
+            res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
+            st.session_state.ultimo_resultado = {"modulo": "Risco Fístula LCR", "valor": res, "tipo": "risco"}
+            salvar_registro("Risco Fístula LCR", res, "risco")
+            st.rerun()
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Risco Fístula LCR":
+            st.metric("Risco Calculado", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+            
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Zhang J, et al. Risk factors and predictive model for postoperative cerebrospinal fluid leakage following endoscopic endonasal pituitary adenoma surgery. *Front Endocrinol*. 2025;16:1695573.  
+            **DOI:** [10.3389/fendo.2025.1695573](https://doi.org/10.3389/fendo.2025.1695573)
+            """)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- ABA D.I. ---
+    with tabs[4]:
+        st.markdown("<div class='calc-info'><strong>Diabetes Insipidus:</strong> Risco de D.I. central no pós-operatório imediato.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: 
+            di_d = st.checkbox("Paciente diabético?")
+            di_h = st.checkbox("Paciente hipertenso?")
+            di_ca = st.checkbox("Cardiopatia prévia?")
+        with c2: 
+            di_co = st.number_input("Cortisol basal pré-op (mmol/L):", 0.0)
+            di_f = st.toggle("Houve fístula no pós-op?")
+            di_r = st.toggle("Textura do tumor rígida?")
+        
+        if st.button("Calcular e Salvar", key="btn_di"):
+            res = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
+            st.session_state.ultimo_resultado = {"modulo": "Diabetes Insipidus", "valor": res, "tipo": "risco"}
+            salvar_registro("Diabetes Insipidus", res, "risco")
+            st.rerun()
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Diabetes Insipidus":
+            st.metric("Risco Calculado", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+            
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Li XJ, et al. Analysis of factors influencing the occurrence of diabetes insipidus following neuroendoscopic transsphenoidal resection of pituitary adenomas and risk assessment. *Heliyon*. 2024;10(1):e38694.  
+            **DOI:** [10.1016/j.heliyon.2024.e38694](https://doi.org/10.1016/j.heliyon.2024.e38694)
+            """)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- ABA HIPONATREMIA ---
+    with tabs[5]:
+        st.markdown("<div class='calc-info'><strong>Hiponatremia Tardia (DPH):</strong> Risco de queda de sódio sérico após a alta hospitalar.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        mod_h = st.radio("Selecione o Modelo:", ["Modelo Cai et al. (Exames de Sangue)", "Modelo Tan et al. (RM e Hormonal)"])
+        hp_12 = st.toggle("Houve queda de Sódio nos dias 1 e 2?", help="Hiponatremia no pós-op imediato.")
+        
+        if mod_h == "Modelo Cai et al. (Exames de Sangue)":
+            h_mo = st.number_input("Monócitos %:", 0.0)
+            h_pt = st.number_input("Tempo de Protrombina (seg):", 0.0)
+            if st.button("Calcular e Salvar", key="btn_cai"):
+                res = risco_pdh_cai_2023(hp_12, h_mo, h_pt)
+                st.session_state.ultimo_resultado = {"modulo": "DPH (Cai)", "valor": res, "tipo": "risco"}
+                salvar_registro("DPH (Cai)", res, "risco")
+                st.rerun()
+                
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Referência (Vancouver):** Cai X, et al. Predictors and dynamic online nomogram for postoperative delayed hyponatremia after endoscopic transsphenoidal surgery for pituitary adenomas. *Chin Neurosurg J*. 2023;9(1):19.  
+                **DOI:** [10.1186/s41016-023-00334-3](https://doi.org/10.1186/s41016-023-00334-3)
+                """)
+        else:
+            h_pr = st.number_input("Prolactina pré-op (ng/mL):", 0.0)
+            h_di = st.number_input("Elevação do diafragma (mm):", 0.0)
+            if st.button("Calcular e Salvar", key="btn_tan"):
+                res = risco_pdh_tan_2025(h_pr, h_di, hp_12)
+                st.session_state.ultimo_resultado = {"modulo": "DPH (Tan)", "valor": res, "tipo": "risco"}
+                salvar_registro("DPH (Tan)", res, "risco")
+                st.rerun()
+                
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Referência (Vancouver):** Tan H, et al. Predictive model of delayed hyponatremia after endoscopic endonasal transsphenoidal resection of pituitary adenoma. *Front Hum Neurosci*. 2025;19:1674519.  
+                **DOI:** [10.3389/fnhum.2025.1674519](https://doi.org/10.3389/fnhum.2025.1674519)
+                """)
+                
+        if st.session_state.ultimo_resultado and "DPH" in st.session_state.ultimo_resultado['modulo']:
+            st.metric("Risco de Hiponatremia", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- ABA MENINGITE ---
+    with tabs[6]:
+        st.markdown("<div class='calc-info'><strong>Meningite Pós-operatória:</strong> Estima o risco de infeção do sistema nervoso central baseado em parâmetros cirúrgicos.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: 
+            m_dur = st.number_input("Duração da cirurgia (horas):", 0.0, step=0.5, help="Tempo total do procedimento cirúrgico.")
+            m_fist = st.toggle("Fístula LCR intraoperatória?", help="Presença de vazamento de líquor durante a cirurgia.")
+        with c2: 
+            m_dia = st.number_input("Diâmetro do tumor (cm):", 0.0, step=0.5, help="Maior diâmetro do tumor verificado na ressonância magnética.")
+        
+        if st.button("Calcular e Salvar", key="btn_meningite"):
+            res = risco_meningite_zhou_2025(m_dur, m_dia, m_fist)
+            st.session_state.ultimo_resultado = {"modulo": "Risco Meningite", "valor": res, "tipo": "risco"}
+            salvar_registro("Risco Meningite", res, "risco")
+            st.rerun()
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Risco Meningite":
+            st.metric("Risco Calculado", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+            
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Zhou P, Shi J, Long Z, et al. Predictive model for meningitis after pituitary tumor resection by endoscopic nasal trans-sphenoidal sinus approach. *Eur J Med Res*. 2025;30:738.  
+            **DOI:** [10.1186/s40001-025-03016-1](https://doi.org/10.1186/s40001-025-03016-1)
+            """)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================
+# HISTÓRICO GERAL
+# ==========================================
+elif nav == "⚙️ Histórico Geral":
+    st.title("⚙️ Banco de Dados Clínico")
+    
+    if os.path.exists(ARQUIVO_CSV):
+        df_geral = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+        
+        if not df_geral.empty:
+            st.dataframe(df_geral.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
+            st.download_button("📥 Exportar Tudo para CSV", df_geral.to_csv(index=False).encode('utf-8'), "historico_hugv.csv", "text/csv")
+            
+            st.markdown("---")
+            st.markdown("### 🗑️ Gerenciamento de Casos (Zona de Exclusão)")
+            st.warning("⚠️ Atenção: A exclusão apagará permanentemente o paciente e todos os seus cálculos associados.")
+            
+            lista_del = df_geral.drop_duplicates(subset=['Prontuário'])
+            opcoes_del = [""] + [f"{row['Prontuário']} - {row['Paciente']}" for _, row in lista_del.iterrows()]
+            
+            pac_del = st.selectbox("Selecione o paciente que deseja excluir do banco de dados:", opcoes_del)
+            
+            if st.button("🚨 Confirmar Exclusão do Caso"):
+                if pac_del != "":
+                    id_del = pac_del.split(" - ")[0]
+                    df_restante = df_geral[df_geral['Prontuário'] != id_del]
+                    df_restante.to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
+                    
+                    if st.session_state.paciente_ativo['prontuario'] == id_del:
+                        st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
+                        st.session_state.ultimo_resultado = None
+                    
+                    st.success(f"O prontuário {id_del} foi excluído com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Selecione um paciente na lista acima para excluir.")
+        else:
+            st.info("Nenhum dado registrado até o momento.")
+    else: 
+        st.info("Nenhum dado registrado até o momento.")
