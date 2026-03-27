@@ -8,8 +8,7 @@ import os
 # ==========================================
 # CONFIGURAÇÃO INICIAL E ESTADO DA SESSÃO
 # ==========================================
-st.set_page_config(page_title="NeuroPreditor Transesfenoidal 
-Harvey", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="NeuroPreditor Transesfenoidal Harvey", layout="wide", page_icon="🧠")
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
