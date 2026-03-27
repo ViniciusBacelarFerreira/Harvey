@@ -173,7 +173,7 @@ if not st.session_state.autenticado:
                 st.error("Senha incorreta. Tente novamente.")
         
         st.markdown("<hr style='opacity: 0.2; margin: 25px 0;'>", unsafe_allow_html=True)
-        st.markdown("<p class='made-by-login'>✨ Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
+        st.markdown("<p class='made-by-login'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
