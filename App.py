@@ -196,7 +196,7 @@ if not st.session_state.autenticado:
                 st.error("Senha incorreta. Tente novamente.")
         
         st.markdown("<hr style='opacity: 0.2; margin: 25px 0;'>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; opacity: 0.8;'>✨ Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; opacity: 0.8;'> Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
     st.stop()
@@ -327,7 +327,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
-            st.markdown("<div class='input-card'><h4>🧂 Hiponatremia (DPH)</h4>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h4> Hiponatremia (DPH)</h4>", unsafe_allow_html=True)
             mod_h = st.radio("Modelo:", ["Cai (Sangue)", "Tan (RM)"])
             hp12 = st.toggle("Hipo D1-D2?")
             if mod_h == "Cai (Sangue)":
