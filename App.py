@@ -116,7 +116,7 @@ def risco_meningite_zhou_2025(duracao_cirurgia_h, diametro_tumor_cm, fistula_int
     beta_duracao = 0.98
     beta_diametro = 0.99
     beta_fistula = 2.22
-    beta_0 = -8.00 # PRECISA DE CALIBRAÇÃO (Estimativa Intercepto)
+    beta_0 = -8.00 
     x_fistula = 1 if fistula_intraop else 0
     logit = beta_0 + (beta_duracao * duracao_cirurgia_h) + (beta_diametro * diametro_tumor_cm) + (beta_fistula * x_fistula)
     return (1 / (1 + math.exp(-logit))) * 100
@@ -224,16 +224,34 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
     
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário</h3>", unsafe_allow_html=True)
-        bp = st.text_input("Número do Prontuário:")
-        if st.button("Abrir Prontuário"):
-            if os.path.exists(ARQUIVO_CSV):
-                df = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-                pdf = df[df['Prontuário'] == str(bp)]
-                if not pdf.empty:
-                    st.session_state.paciente_ativo = {"prontuario": str(bp), "nome": pdf.iloc[0]['Paciente'], "mae": pdf.iloc[0]['Mãe']}
-                    st.rerun()
-            st.error("Paciente não encontrado no histórico.")
+        st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
+        
+        # Puxar lista de pacientes do arquivo se existir
+        if os.path.exists(ARQUIVO_CSV):
+            df_busca = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+            if not df_busca.empty:
+                # Remove duplicados para mostrar apenas 1 vez cada paciente na lista
+                lista_prontuarios = df_busca.drop_duplicates(subset=['Prontuário'])
+                opcoes_pacientes = [""] + [f"{row['Prontuário']} - {row['Paciente']}" for _, row in lista_prontuarios.iterrows()]
+                
+                paciente_selecionado = st.selectbox("Selecione um paciente já cadastrado:", opcoes_pacientes)
+                
+                if st.button("Abrir Prontuário"):
+                    if paciente_selecionado != "":
+                        bp = paciente_selecionado.split(" - ")[0]
+                        pdf_data = df_busca[df_busca['Prontuário'] == str(bp)]
+                        if not pdf_data.empty:
+                            st.session_state.paciente_ativo = {"prontuario": str(bp), "nome": pdf_data.iloc[0]['Paciente'], "mae": pdf_data.iloc[0]['Mãe']}
+                            st.rerun()
+                    else:
+                        st.warning("Selecione um paciente na lista acima.")
+            else:
+                st.info("Nenhum paciente cadastrado no banco de dados.")
+        else:
+            st.info("Nenhum paciente cadastrado no banco de dados.")
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+        
     with c2:
         st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
         nn = st.text_input("Nome do Paciente:")
@@ -244,6 +262,7 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             else: st.warning("Nome e Prontuário são obrigatórios.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
 # INTERFACE DO PRONTUÁRIO ATIVO
@@ -444,7 +463,7 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
             st.metric("Risco de Hiponatremia", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
             st.success("Resultado arquivado com sucesso!")
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
     # --- ABA MENINGITE ---
     with tabs[6]:
         st.markdown("<div class='calc-info'><strong>Meningite Pós-operatória:</strong> Estima o risco de infeção do sistema nervoso central baseado em parâmetros cirúrgicos.</div>", unsafe_allow_html=True)
@@ -478,9 +497,38 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
 # ==========================================
 elif nav == "⚙️ Histórico Geral":
     st.title("⚙️ Banco de Dados Clínico")
+    
     if os.path.exists(ARQUIVO_CSV):
         df_geral = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-        st.dataframe(df_geral.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("📥 Exportar Tudo para CSV", df_geral.to_csv(index=False).encode('utf-8'), "historico_hugv.csv", "text/csv")
+        
+        if not df_geral.empty:
+            st.dataframe(df_geral.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
+            st.download_button("📥 Exportar Tudo para CSV", df_geral.to_csv(index=False).encode('utf-8'), "historico_hugv.csv", "text/csv")
+            
+            st.markdown("---")
+            st.markdown("### 🗑️ Gerenciamento de Casos (Zona de Exclusão)")
+            st.warning("⚠️ Atenção: A exclusão apagará permanentemente o paciente e todos os seus cálculos associados.")
+            
+            lista_del = df_geral.drop_duplicates(subset=['Prontuário'])
+            opcoes_del = [""] + [f"{row['Prontuário']} - {row['Paciente']}" for _, row in lista_del.iterrows()]
+            
+            pac_del = st.selectbox("Selecione o paciente que deseja excluir do banco de dados:", opcoes_del)
+            
+            if st.button("🚨 Confirmar Exclusão do Caso"):
+                if pac_del != "":
+                    id_del = pac_del.split(" - ")[0]
+                    df_restante = df_geral[df_geral['Prontuário'] != id_del]
+                    df_restante.to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
+                    
+                    if st.session_state.paciente_ativo['prontuario'] == id_del:
+                        st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
+                        st.session_state.ultimo_resultado = None
+                    
+                    st.success(f"O prontuário {id_del} foi excluído com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Selecione um paciente na lista acima para excluir.")
+        else:
+            st.info("Nenhum dado registrado até o momento.")
     else: 
         st.info("Nenhum dado registrado até o momento.")
