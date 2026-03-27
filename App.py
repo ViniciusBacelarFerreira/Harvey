@@ -14,8 +14,11 @@ if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
-if 'ultimo_resultado' not in st.session_state:
-    st.session_state.ultimo_resultado = None
+
+# Variáveis de sessão para manter o resultado na tela da respectiva aba
+for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res']:
+    if mod not in st.session_state:
+        st.session_state[mod] = None
 
 ARQUIVO_CSV = "registro_pacientes.csv"
 SENHA_CORRETA = "hugv1869"
@@ -23,6 +26,7 @@ SENHA_CORRETA = "hugv1869"
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
+
 def risco_meningite_zhou_2025(duracao_h, diametro_cm, fistula_intra):
     beta_duracao, beta_diametro, beta_fistula = 0.98, 0.99, 2.22
     beta_0 = -7.50 
@@ -82,11 +86,10 @@ def salvar_registro(mod, prob, tipo, parametros=""):
     return True
 
 # ==========================================
-# ESTILOS CSS INTELIGENTES E ELEGANTES
+# ESTILOS CSS INTELIGENTES (DARK/LIGHT MODE)
 # ==========================================
 st.markdown("""
 <style>
-    /* Estilos Gerais */
     .login-box { 
         background-color: var(--secondary-background-color); 
         border-radius: 24px; 
@@ -123,7 +126,6 @@ st.markdown("""
     
     .harvey-text { font-family: 'Georgia', serif; font-style: italic; color: #b8860b; margin-left: 10px; }
     
-    /* Cabeçalho do Paciente (Patient ID Card) */
     .patient-header { 
         background: linear-gradient(135deg, #0b2e59, #1565c0); 
         color: white; 
@@ -136,7 +138,6 @@ st.markdown("""
         box-shadow: 0 10px 30px rgba(11, 46, 89, 0.2);
     }
     
-    /* Estilo Profissional dos Cards de Resultado (Left-Accent Border) */
     .dashboard-card { 
         background-color: var(--secondary-background-color); 
         border-radius: 16px; 
@@ -150,17 +151,13 @@ st.markdown("""
         flex-direction: column;
         justify-content: space-between;
     }
-    .dashboard-card:hover { 
-        transform: translateY(-4px); 
-        box-shadow: 0 12px 32px rgba(0,0,0,0.1);
-    }
+    .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); }
     .card-value { font-size: 2.5rem; font-weight: 800; margin: 10px 0; line-height: 1; }
     
     .b-green { border-left-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
     .b-orange { border-left-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
     .b-red { border-left-color: #c62828 !important; } .t-red { color: #c62828 !important; }
     
-    /* Formulários e Entradas */
     .input-card { 
         background-color: var(--secondary-background-color); 
         padding: 35px; 
@@ -171,7 +168,6 @@ st.markdown("""
         border: 1px solid rgba(128, 128, 128, 0.1); 
     }
     
-    /* Informações de Apoio (Alertas) */
     .calc-info { 
         background-color: rgba(21, 101, 192, 0.05); 
         padding: 16px 20px; 
@@ -182,24 +178,6 @@ st.markdown("""
         color: var(--text-color); 
         box-shadow: 0 2px 10px rgba(0,0,0,0.02);
     }
-
-    /* Modernização das Abas (Tabs) do Streamlit */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: var(--secondary-background-color);
-        border-radius: 10px 10px 0 0;
-        padding: 10px 24px;
-        border: 1px solid rgba(128,128,128,0.15);
-        border-bottom: none;
-        transition: background-color 0.2s;
-    }
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #0b2e59, #1565c0);
-        color: white !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -208,7 +186,6 @@ st.markdown("""
 # ==========================================
 if not st.session_state.autenticado:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<div class='login-box'>", unsafe_allow_html=True)
@@ -225,10 +202,8 @@ if not st.session_state.autenticado:
                 st.error("Senha incorreta. Tente novamente.")
         
         st.markdown("<hr style='opacity: 0.15; margin: 30px 0 20px 0;'>", unsafe_allow_html=True)
-        # Removido o Emoji e ajustado o layout da assinatura
         st.markdown("<p style='font-size: 0.85rem; font-weight: 600; opacity: 0.7; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
-        
     st.stop()
 
 # ==========================================
@@ -239,7 +214,6 @@ with st.sidebar:
     st.markdown("<h4 style='color: #1565c0; margin-top: 5px;'>HUGV - UFAM</h4>", unsafe_allow_html=True)
     st.markdown("<h2 style='color: #1565c0; margin-top: 15px;'>Harvey</h2>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
-    
     st.markdown("---")
     nav = st.radio("Navegação:", ["🏠 Área de Trabalho", "⚙️ Histórico Geral"])
     
@@ -247,15 +221,15 @@ with st.sidebar:
         st.markdown("---")
         if st.button("❌ Fechar Prontuário Atual", type="primary", use_container_width=True):
             st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
-            st.session_state.ultimo_resultado = None
+            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res']:
+                st.session_state[mod] = None
             st.rerun()
 
     st.markdown("---")
     with st.expander("🌓 Tema (Claro/Escuro)"):
-        st.write("O sistema adapta-se automaticamente. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito > **Settings** > **Theme**.")
+        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito da tela > **Settings** > **Theme**.")
     
     st.markdown("<br><p style='text-align: center; font-size: 0.8rem; font-weight: bold; opacity: 0.7;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
-    
     st.markdown("---")
     if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
@@ -272,7 +246,7 @@ if nav == "🏠 Área de Trabalho":
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
             if os.path.exists(ARQUIVO_CSV):
                 df_b = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
                 lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.drop_duplicates(subset=['Prontuário']).iterrows()]
@@ -287,20 +261,21 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
             
         with c2:
-            st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
-            nn = st.text_input("Nome:")
+            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Paciente</h3>", unsafe_allow_html=True)
+            nn = st.text_input("Nome Completo do Paciente:")
             nm = st.text_input("Nome da Mãe:")
-            np = st.text_input("Prontuário:")
+            np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar e Iniciar", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+            
     else:
         st.markdown(f"""
         <div class="patient-header">
             <div>
-                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Ativo</p>
+                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Eletrônico Ativo</p>
                 <h2 style="margin-top:0; margin-bottom:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2>
             </div>
             <div style="text-align: right;">
@@ -312,8 +287,144 @@ if nav == "🏠 Área de Trabalho":
         
         tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
 
-        with tabs[0]: 
-            st.subheader("📊 Resultados Consolidados")
+        # Usando placeholders para permitir que o Painel e Relatório sejam preenchidos no final (após os cálculos)
+        painel_placeholder = tabs[0].empty()
+        relatorio_placeholder = tabs[7].empty()
+
+        with tabs[1]: 
+            st.markdown("<div class='input-card'><h4>👁️ Recuperação Visual</h4>", unsafe_allow_html=True)
+            v1, v2 = st.columns(2)
+            with v1: 
+                v_q = st.toggle("Havia compressão do quiasma óptico?")
+                v_d = st.toggle("Apresentava defeito campimétrico difuso?")
+            with v2: 
+                v_m = st.number_input("Duração dos sintomas visuais (meses):", 0)
+                v_md = st.number_input("Mean Defect (MD) pré-operatório (dB):", 0.0)
+            if st.button("Calcular e Salvar Probabilidade Visual", key="btn_visao"):
+                res = risco_melhora_visual_ji_2023(v_q, v_d, v_m, v_md)
+                params = f"Compressão Quiasma: {'Sim' if v_q else 'Não'} | Defeito Difuso: {'Sim' if v_d else 'Não'} | Sintomas: {v_m} meses | MD: {v_md} dB"
+                st.session_state.visao_res = res
+                salvar_registro("Prognóstico Visual", res, "melhora", params)
+            
+            if st.session_state.visao_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Probabilidade Calculada", f"{st.session_state.visao_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+    
+        with tabs[2]: 
+            st.markdown("<div class='input-card'><h4>🔄 Doença de Cushing</h4>", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1: 
+                c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1")
+                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?")
+            with c2: 
+                c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2)
+                c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"])
+            if st.button("Calcular e Salvar Risco de Recorrência", key="btn_cushing"):
+                res = risco_recorrencia_cushing_cuper_2025(c_dur, c_h, c_l, c_cp)
+                params = f"Sintomas: {c_dur} meses | Cirurgia Prévia: {'Sim' if c_cp else 'Não'} | Grau Hardy: {c_h} | Localização: {c_l}"
+                st.session_state.cushing_res = res
+                salvar_registro("Recorrência Cushing", res, "risco", params)
+            
+            if st.session_state.cushing_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Risco Calculado", f"{st.session_state.cushing_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with tabs[3]: 
+            st.markdown("<div class='input-card'><h4>💧 Fístula de Líquor</h4>", unsafe_allow_html=True)
+            f1, f2 = st.columns(2)
+            with f1: 
+                f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?")
+                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?")
+            with f2: 
+                f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?")
+                f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0)
+            if st.button("Calcular e Salvar Risco de Fístula", key="btn_fistula"):
+                res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
+                params = f"Kelly ≥ 2: {'Sim' if f_k else 'Não'} | Supra ≥ B: {'Sim' if f_s else 'Não'} | Pneumoencéfalo ≥ 3: {'Sim' if f_p else 'Não'} | Janela óssea: {f_j} mm"
+                st.session_state.fistula_res = res
+                salvar_registro("Risco Fístula LCR", res, "risco", params)
+
+            if st.session_state.fistula_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Risco Calculado", f"{st.session_state.fistula_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with tabs[4]: 
+            st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
+            d1, d2 = st.columns(2)
+            with d1: 
+                di_d = st.checkbox("Paciente possui Diabetes Mellitus?")
+                di_h = st.checkbox("Paciente possui Hipertensão Arterial?")
+                di_ca = st.checkbox("Paciente possui Cardiopatia prévia?")
+            with d2: 
+                di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0)
+                di_f = st.toggle("Apresentou fístula liquórica no pós-operatório?")
+                di_r = st.toggle("Textura do tumor era firme/rígida na cirurgia?")
+            if st.button("Calcular e Salvar Risco de D.I.", key="btn_di"):
+                res = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
+                params = f"DM: {'Sim' if di_d else 'Não'} | HAS: {'Sim' if di_h else 'Não'} | Cardio: {'Sim' if di_ca else 'Não'} | Cortisol pré-op: {di_co} | Fístula: {'Sim' if di_f else 'Não'} | Tumor Rígido: {'Sim' if di_r else 'Não'}"
+                st.session_state.di_res = res
+                salvar_registro("Diabetes Insipidus", res, "risco", params)
+                
+            if st.session_state.di_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Risco Calculado", f"{st.session_state.di_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with tabs[5]: 
+            st.markdown("<div class='input-card'><h4>🧂 Hiponatremia Tardia (DPH)</h4>", unsafe_allow_html=True)
+            mod_h = st.radio("Selecione a base do modelo preditivo:", ["Modelo de Sangue (Cai et al.)", "Modelo de Imagem/Hormonal (Tan et al.)"])
+            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?")
+            
+            if mod_h == "Modelo de Sangue (Cai et al.)":
+                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0)
+                pt = st.number_input("Tempo de Protrombina (segundos):", 0.0)
+                if st.button("Calcular e Salvar Risco (Modelo Cai)", key="btn_hipo_cai"):
+                    res = risco_pdh_cai_2023(hp12, mo, pt)
+                    params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Monócitos: {mo}% | Tempo de Protrombina: {pt} seg"
+                    st.session_state.hipo_res = res
+                    salvar_registro("DPH (Modelo Cai)", res, "risco", params)
+            else:
+                pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0)
+                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0)
+                if st.button("Calcular e Salvar Risco (Modelo Tan)", key="btn_hipo_tan"):
+                    res = risco_pdh_tan_2025(pr, dia, hp12)
+                    params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina pré-op: {pr} ng/mL | Elevação Diafragma: {dia} mm"
+                    st.session_state.hipo_res = res
+                    salvar_registro("DPH (Modelo Tan)", res, "risco", params)
+                    
+            if st.session_state.hipo_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Risco Calculado", f"{st.session_state.hipo_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with tabs[6]: 
+            st.markdown("<div class='input-card'><h4>🦠 Meningite Pós-operatória</h4>", unsafe_allow_html=True)
+            m1, m2 = st.columns(2)
+            with m1: 
+                md = st.number_input("Duração total da cirurgia (horas):", 0.0)
+                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?")
+            with m2: 
+                mt = st.number_input("Diâmetro máximo do tumor na RM (cm):", 0.0)
+            if st.button("Calcular e Salvar Risco de Meningite", key="btn_meningite"):
+                res = risco_meningite_zhou_2025(md, mt, mf)
+                params = f"Duração Cirurgia: {md} horas | Diâmetro do Tumor: {mt} cm | Fístula Intraop: {'Sim' if mf else 'Não'}"
+                st.session_state.meningite_res = res
+                salvar_registro("Risco Meningite", res, "risco", params)
+                
+            if st.session_state.meningite_res is not None:
+                st.success("Resultado arquivado com sucesso no Painel!")
+                st.metric("Risco Calculado", f"{st.session_state.meningite_res:.1f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        # =======================================================
+        # PREENCHIMENTO DOS PLACEHOLDERS (LENDO O ARQUIVO ATUALIZADO)
+        # =======================================================
+        
+        with painel_placeholder.container():
+            st.subheader("📊 Resultados Consolidados e Arquivados")
             if os.path.exists(ARQUIVO_CSV):
                 df_h = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
                 df_p = df_h[df_h['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
@@ -336,85 +447,12 @@ if nav == "🏠 Área de Trabalho":
                                 </div>
                             </div><br>
                             """, unsafe_allow_html=True)
-                else: st.info("Nenhum cálculo salvo.")
-
-        with tabs[1]: 
-            st.markdown("<div class='input-card'><h4>👁️ Visão</h4>", unsafe_allow_html=True)
-            v1, v2 = st.columns(2)
-            with v1: vq = st.toggle("Compressão do quiasma?"); vd = st.toggle("Defeito difuso?")
-            with v2: vm = st.number_input("Duração (meses):", 0); vmd = st.number_input("MD (dB) pré-op:", 0.0)
-            if st.button("Calcular e Salvar Visão"):
-                res = risco_melhora_visual_ji_2023(vq, vd, vm, vmd)
-                params = f"Compressão Quiasma: {'Sim' if vq else 'Não'} | Defeito Difuso: {'Sim' if vd else 'Não'} | Sintomas: {vm} meses | MD: {vmd} dB"
-                salvar_registro("Prognóstico Visual", res, "melhora", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-    
-        with tabs[2]: 
-            st.markdown("<div class='input-card'><h4>🔄 Cushing</h4>", unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1: cd = st.number_input("Meses sintomas:", 0, key="c1"); cc = st.toggle("Cirurgia prévia?")
-            with c2: ch = st.select_slider("Hardy:", [0,1,2,3,4], value=2); cl = st.selectbox("Localização:", ["Bilateral","Direita","Esquerda","Central","Haste"])
-            if st.button("Calcular Cushing"):
-                res = risco_recorrencia_cushing_cuper_2025(cd, ch, cl, cc)
-                params = f"Sintomas: {cd} meses | Cirurgia Prévia: {'Sim' if cc else 'Não'} | Grau Hardy: {ch} | Localização: {cl}"
-                salvar_registro("Recorrência Cushing", res, "risco", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with tabs[3]: 
-            st.markdown("<div class='input-card'><h4>💧 Fístula LCR</h4>", unsafe_allow_html=True)
-            f1, f2 = st.columns(2)
-            with f1: fk = st.toggle("Kelly ≥ 2?"); fs = st.toggle("Suprasselar ≥ B?")
-            with f2: fp = st.toggle("Pneumoencéfalo ≥ 3?"); fj = st.number_input("Janela (mm):", 0.0)
-            if st.button("Calcular Fístula"):
-                res = risco_fistula_lcr_zhang_2025(fk, fs, fp, fj)
-                params = f"Kelly ≥ 2: {'Sim' if fk else 'Não'} | Supra ≥ B: {'Sim' if fs else 'Não'} | Pneumoencéfalo ≥ 3: {'Sim' if fp else 'Não'} | Janela óssea: {fj} mm"
-                salvar_registro("Risco Fístula LCR", res, "risco", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with tabs[4]: 
-            st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
-            d1, d2 = st.columns(2)
-            with d1: dd = st.checkbox("DM?"); dh = st.checkbox("HAS?"); dc = st.checkbox("Cardio?")
-            with d2: dco = st.number_input("Cortisol:", 0.0); df_ = st.toggle("Fístula?"); dr = st.toggle("Rígido?")
-            if st.button("Calcular D.I."):
-                res = risco_diabetes_insipidus_li_2024(dd, dh, dc, dco, df_, dr)
-                params = f"DM: {'Sim' if dd else 'Não'} | HAS: {'Sim' if dh else 'Não'} | Cardio: {'Sim' if dc else 'Não'} | Cortisol: {dco} | Fístula: {'Sim' if df_ else 'Não'} | Tumor Rígido: {'Sim' if dr else 'Não'}"
-                salvar_registro("Diabetes Insipidus", res, "risco", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with tabs[5]: 
-            st.markdown("<div class='input-card'><h4>🧂 Hiponatremia (DPH)</h4>", unsafe_allow_html=True)
-            mod_h = st.radio("Modelo:", ["Cai (Sangue)", "Tan (RM)"])
-            hp12 = st.toggle("Hipo D1-D2?")
-            if mod_h == "Cai (Sangue)":
-                mo = st.number_input("Monócitos %:", 0.0); pt = st.number_input("PT (seg):", 0.0)
-                if st.button("Calcular DPH (Cai)"):
-                    res = risco_pdh_cai_2023(hp12, mo, pt)
-                    params = f"Hipo D1-D2: {'Sim' if hp12 else 'Não'} | Monócitos: {mo}% | PT: {pt} seg"
-                    salvar_registro("DPH (Cai)", res, "risco", params); st.rerun()
-            else:
-                pr = st.number_input("PRL pré-op:", 0.0); dia = st.number_input("Diafragma (mm):", 0.0)
-                if st.button("Calcular DPH (Tan)"):
-                    res = risco_pdh_tan_2025(pr, dia, hp12)
-                    params = f"Hipo D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina: {pr} ng/mL | Elevação Diafragma: {dia} mm"
-                    salvar_registro("DPH (Tan)", res, "risco", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with tabs[6]: 
-            st.markdown("<div class='input-card'><h4>🦠 Meningite Pós-operatória</h4>", unsafe_allow_html=True)
-            m1, m2 = st.columns(2)
-            with m1: md = st.number_input("Duração (h):", 0.0); mf = st.toggle("Fístula intraop?")
-            with m2: mt = st.number_input("Diâmetro (cm):", 0.0)
-            if st.button("Calcular Meningite"):
-                res = risco_meningite_zhou_2025(md, mt, mf)
-                params = f"Duração: {md} h | Diâmetro: {mt} cm | Fístula Intraop: {'Sim' if mf else 'Não'}"
-                salvar_registro("Risco Meningite", res, "risco", params); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-        # --- RELATÓRIO A4 HTML IMPRIMÍVEL ---
-        with tabs[7]:
-            st.markdown("### 🖨️ Relatório (Tamanho A4)")
-            st.info("Clique no botão abaixo para imprimir. Ative os **Gráficos de segundo plano** nas opções de impressão do navegador para manter as cores do cabeçalho.")
+                else: 
+                    st.info("Nenhum cálculo salvo ainda. Realize as avaliações nas abas acima.")
+                    
+        with relatorio_placeholder.container():
+            st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
+            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema.")
             
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
@@ -424,7 +462,7 @@ if nav == "🏠 Área de Trabalho":
                 if not df_rel_pac.empty:
                     df_latest_rel = df_rel_pac.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
                     for _, r in df_latest_rel.iterrows():
-                        param_str = r.get("Parâmetros Inseridos", "Parâmetros antigos")
+                        param_str = r.get("Parâmetros Inseridos", "-")
                         if pd.isna(param_str): param_str = "-"
                         
                         linhas_html += f"""
@@ -464,12 +502,12 @@ if nav == "🏠 Área de Trabalho":
             <body>
                 <div style="width: 210mm; max-width: 100%;">
                     <div class="no-print">
-                        <button class="print-button" onclick="window.print()">🖨️ IMPRIMIR RELATÓRIO</button>
+                        <button class="print-button" onclick="window.print()">🖨️ CLIQUE AQUI PARA IMPRIMIR OU SALVAR EM PDF</button>
                     </div>
                     <div class="a4-page">
                         <div class="header">
                             <h1>Hospital Universitário Getúlio Vargas</h1>
-                            <h3>NeuroPreditor Harvey - Relatório de Avaliação Preditiva Transesfenoidal</h3>
+                            <h3>NeuroPreditor Harvey - Relatório de Avaliação Preditiva</h3>
                         </div>
                         
                         <div class="patient-box">
@@ -491,7 +529,7 @@ if nav == "🏠 Área de Trabalho":
                         </table>
                         
                         <div style="font-size: 11px; color: #666; text-align: justify; background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 3px solid #ffc107;">
-                            <b style="color: #856404;">Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura internacional (Nomogramas). Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado do neurocirurgião ou endocrinologista responsável.
+                            <b style="color: #856404;">Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura científica. Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado.
                         </div>
                         
                         <div class="footer">
@@ -503,20 +541,19 @@ if nav == "🏠 Área de Trabalho":
             </body>
             </html>
             """
-            
             components.html(html_relatorio, height=1200, scrolling=True)
 
 # ==========================================
 # HISTÓRICO GERAL
 # ==========================================
 elif nav == "⚙️ Histórico Geral":
-    st.title("⚙️ Gerenciamento de Dados")
+    st.title("⚙️ Gerenciamento de Dados Clínicos")
     if os.path.exists(ARQUIVO_CSV):
         df_g = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("📥 Exportar Planilha Completa", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
+        st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Excluir Paciente")
+        st.subheader("🗑️ Excluir Paciente do Sistema")
         lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
         del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
         if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
