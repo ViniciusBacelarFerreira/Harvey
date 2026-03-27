@@ -83,21 +83,94 @@ def salvar_registro(mod, prob, tipo, parametros=""):
     return True
 
 # ==========================================
-# ESTILOS CSS
+# ESTILOS CSS INTELIGENTES (DARK/LIGHT MODE)
 # ==========================================
 st.markdown("""
 <style>
-    .stApp { background: linear-gradient(135deg, #021d33 0%, #0b2e59 50%, #1565c0 100%); }
-    .login-box { background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(15px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); padding: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); text-align: center; max-width: 500px; margin: auto; }
-    .watermark { position: fixed; bottom: 20px; right: 30px; opacity: 0.4; color: white; font-family: 'Georgia', serif; font-style: italic; font-size: 0.9rem; pointer-events: none; }
-    .main-title { background: -webkit-linear-gradient(45deg, #ffd700, #b8860b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; font-size: 3.5rem; text-align: center; }
-    .patient-header { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
-    .dashboard-card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; border-top: 6px solid #ddd; color: #333; }
+    /* Uso de variáveis nativas do Streamlit para adaptação Dark/Light Mode automática */
+    .login-box { 
+        background-color: var(--secondary-background-color); 
+        border-radius: 20px; 
+        border: 1px solid rgba(128, 128, 128, 0.2); 
+        padding: 40px; 
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); 
+        text-align: center; 
+        max-width: 500px; 
+        margin: auto; 
+        color: var(--text-color);
+    }
+    
+    .watermark { 
+        position: fixed; 
+        bottom: 20px; 
+        right: 30px; 
+        opacity: 0.5; 
+        font-family: 'Georgia', serif; 
+        font-style: italic; 
+        font-size: 0.9rem; 
+        pointer-events: none; 
+        color: var(--text-color); 
+    }
+    
+    .main-title { 
+        background: -webkit-linear-gradient(45deg, #1565c0, #b8860b); 
+        -webkit-background-clip: text; 
+        -webkit-text-fill-color: transparent; 
+        font-weight: 900; 
+        font-size: 3.5rem; 
+        text-align: center; 
+    }
+    
+    .harvey-text { font-family: 'Georgia', serif; font-style: italic; color: #b8860b; margin-left: 10px; }
+    
+    .patient-header { 
+        background-color: var(--secondary-background-color); 
+        border: 1px solid rgba(128,128,128,0.2); 
+        color: var(--text-color); 
+        padding: 20px; 
+        border-radius: 15px; 
+        margin-bottom: 20px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+    }
+    
+    .dashboard-card { 
+        background-color: var(--secondary-background-color); 
+        border-radius: 15px; 
+        padding: 20px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        text-align: center; 
+        border-top: 6px solid #ddd; 
+        color: var(--text-color); 
+        transition: transform 0.2s; 
+    }
+    .dashboard-card:hover { transform: translateY(-5px); }
     .card-value { font-size: 2.8rem; font-weight: 800; margin: 5px 0; }
+    
     .b-green { border-top-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
     .b-orange { border-top-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
     .b-red { border-top-color: #c62828 !important; } .t-red { color: #c62828 !important; }
-    .input-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-top: 20px; color: #333; }
+    
+    .input-card { 
+        background-color: var(--secondary-background-color); 
+        padding: 30px; 
+        border-radius: 15px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+        margin-top: 20px; 
+        color: var(--text-color); 
+        border: 1px solid rgba(128, 128, 128, 0.2); 
+    }
+    
+    .calc-info { 
+        background-color: rgba(21, 101, 192, 0.1); 
+        padding: 12px; 
+        border-radius: 8px; 
+        border-left: 5px solid #1565c0; 
+        margin-bottom: 20px; 
+        font-size: 0.95rem; 
+        color: var(--text-color); 
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,34 +179,67 @@ st.markdown("""
 # ==========================================
 if not st.session_state.autenticado:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
-    st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-    st.markdown("<h1 style='color: white;'>NeuroPreditor <span style='font-family: Georgia; font-style: italic; color: #ffd700;'>Harvey</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: rgba(255,255,255,0.7);'>Acesso Restrito - Hospital Universitário Getúlio Vargas</p>", unsafe_allow_html=True)
-    senha = st.text_input("Senha Institucional:", type="password")
-    if st.button("DESBLOQUEAR ACESSO"):
-        if senha == SENHA_CORRETA:
-            st.session_state.autenticado = True
-            st.rerun()
-        else: st.error("Senha incorreta.")
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<div class='watermark'>By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
+        st.markdown("<h1 class='main-title' style='font-size: 2.8rem;'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 1rem; opacity: 0.8;'>Acesso Restrito - Hospital Universitário Getúlio Vargas</p>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        senha = st.text_input("Senha Institucional:", type="password", placeholder="Insira a senha...")
+        if st.button("DESBLOQUEAR ACESSO", use_container_width=True):
+            if senha == SENHA_CORRETA:
+                st.session_state.autenticado = True
+                st.rerun()
+            else: 
+                st.error("Senha incorreta. Tente novamente.")
+        
+        st.markdown("<hr style='opacity: 0.2; margin: 25px 0;'>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; opacity: 0.8;'>✨ Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
     st.stop()
 
 # ==========================================
-# NAVEGAÇÃO
+# NAVEGAÇÃO / MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.markdown("<h2 style='color: #ffd700;'>Harvey</h2>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    st.markdown("<h4 style='color: #1565c0; margin-top: 5px;'>HUGV - UFAM</h4>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #1565c0; margin-top: 15px;'>Harvey</h2>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("---")
     nav = st.radio("Navegação:", ["🏠 Área de Trabalho", "⚙️ Histórico Geral"])
+    
+    if st.session_state.paciente_ativo['prontuario']:
+        st.markdown("---")
+        if st.button("❌ Fechar Prontuário Atual", type="primary"):
+            st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
+            st.session_state.ultimo_resultado = None
+            st.rerun()
+
+    st.markdown("---")
+    with st.expander("🌓 Tema (Claro/Escuro)"):
+        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito da tela > **Settings** > **Theme**.")
+    
+    st.markdown("<br><p style='text-align: center; font-size: 0.8rem; font-weight: bold; opacity: 0.7;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
+    
+    st.markdown("---")
     if st.button("🚪 Sair do Sistema"):
         st.session_state.autenticado = False
         st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
         st.rerun()
 
-# --- ÁREA DE TRABALHO ---
+# ==========================================
+# ÁREA DE TRABALHO
+# ==========================================
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
-        st.markdown("<h1 class='main-title'>NeuroPreditor Harvey</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 class='main-title'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card' style='text-align: center;'><p style='font-size:1.2rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
+        
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário</h3>", unsafe_allow_html=True)
@@ -146,17 +252,20 @@ if nav == "🏠 Área de Trabalho":
                     dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
                     st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
                     st.rerun()
-            else: st.info("Sem registros.")
+            else: st.info("Sem registros no momento.")
             st.markdown("</div>", unsafe_allow_html=True)
+            
         with c2:
             st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
-            nn, nm, np = st.text_input("Nome:"), st.text_input("Mãe:"), st.text_input("Prontuário:")
+            nn = st.text_input("Nome:")
+            nm = st.text_input("Nome da Mãe:")
+            np = st.text_input("Prontuário:")
             if st.button("Cadastrar") and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f'<div class="patient-header"><div><p style="font-size:0.8rem;opacity:0.8;margin-bottom:0;">PRONTUÁRIO ATIVO</p><h2 style="margin-top:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2></div><div><p>Prontuário: <b>{st.session_state.paciente_ativo["prontuario"]}</b></p><button style="background:transparent;border:1px solid white;color:white;border-radius:5px;cursor:pointer;" onclick="window.location.reload();">Trocar Paciente</button></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="patient-header"><div><p style="font-size:0.8rem;opacity:0.8;margin-bottom:0;">PRONTUÁRIO ATIVO</p><h2 style="margin-top:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2></div><div><p style="margin-bottom:0;">Prontuário: <b>{st.session_state.paciente_ativo["prontuario"]}</b></p></div></div>', unsafe_allow_html=True)
         tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
 
         with tabs[0]: 
@@ -170,14 +279,14 @@ if nav == "🏠 Área de Trabalho":
                     for i, r in df_l.iterrows():
                         v = float(r['Resultado (%)'])
                         _, cor = obter_classificacao(v, r['Tipo'])
-                        st.markdown(f'<div class="dashboard-card b-{cor}"><div style="font-weight:bold;color:#555;">{r["Avaliação Clínica"]}</div><div class="card-value t-{cor}">{v}%</div><div style="font-weight:bold;" class="t-{cor}">{r["Classificação"]}</div><div style="font-size:0.7rem;color:#aaa;">{r["Data/Hora"]}</div></div><br>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="dashboard-card b-{cor}"><div style="font-weight:bold; opacity:0.8;">{r["Avaliação Clínica"]}</div><div class="card-value t-{cor}">{v}%</div><div style="font-weight:bold;" class="t-{cor}">{r["Classificação"]}</div><div style="font-size:0.7rem;opacity:0.6;">{r["Data/Hora"]}</div></div><br>', unsafe_allow_html=True)
                 else: st.info("Nenhum cálculo salvo.")
 
         with tabs[1]: 
             st.markdown("<div class='input-card'><h4>👁️ Visão</h4>", unsafe_allow_html=True)
             v1, v2 = st.columns(2)
             with v1: vq = st.toggle("Compressão do quiasma?"); vd = st.toggle("Defeito difuso?")
-            with v2: vm = st.number_input("Duração (meses):", 0); vmd = st.number_input("MD (dB):", 0.0)
+            with v2: vm = st.number_input("Duração (meses):", 0); vmd = st.number_input("MD (dB) pré-op:", 0.0)
             if st.button("Calcular e Salvar Visão"):
                 res = risco_melhora_visual_ji_2023(vq, vd, vm, vmd)
                 params = f"Compressão Quiasma: {'Sim' if vq else 'Não'} | Defeito Difuso: {'Sim' if vd else 'Não'} | Sintomas: {vm} meses | MD: {vmd} dB"
@@ -246,12 +355,11 @@ if nav == "🏠 Área de Trabalho":
                 salvar_registro("Risco Meningite", res, "risco", params); st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
             
-        # --- NOVO RELATÓRIO A4 HTML IMPRIMÍVEL ---
+        # --- RELATÓRIO A4 HTML IMPRIMÍVEL ---
         with tabs[7]:
-            st.markdown("### 🖨️ Pré-visualização do Relatório (Tamanho A4)")
-            st.info("Clique no botão 'IMPRIMIR RELATÓRIO' abaixo. Para um melhor resultado, nas definições de impressão do seu navegador, garanta que a opção **'Gráficos de segundo plano' / 'Background graphics'** está ativada e as **Margens** estão em 'Nenhuma' ou 'Padrão'.")
+            st.markdown("### 🖨️ Relatório (Tamanho A4)")
+            st.info("Clique no botão abaixo para imprimir. Ative os **Gráficos de segundo plano** nas opções de impressão do navegador para manter as cores do cabeçalho.")
             
-            # Puxar dados para o relatório
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
                 df_rel = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
@@ -267,20 +375,19 @@ if nav == "🏠 Área de Trabalho":
                         <tr>
                             <td style="font-weight: bold; color: #0b2e59;">{r['Avaliação Clínica']}</td>
                             <td style="font-size: 12px; color: #555;">{param_str}</td>
-                            <td style="font-weight: bold; text-align: center;">{r['Resultado (%)']}%</td>
-                            <td style="text-align: center;">{r['Classificação']}</td>
+                            <td style="font-weight: bold; text-align: center; color: #333;">{r['Resultado (%)']}%</td>
+                            <td style="text-align: center; color: #333;">{r['Classificação']}</td>
                         </tr>
                         """
             
-            # Template HTML A4
             html_relatorio = f"""
             <html>
             <head>
             <style>
-                body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #e0e0e0; margin: 0; padding: 20px; display: flex; justify-content: center; }}
-                .print-button {{ background: #0b2e59; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: transparent; margin: 0; padding: 20px; display: flex; justify-content: center; }}
+                .print-button {{ background: #0b2e59; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; }}
                 .print-button:hover {{ background: #1565c0; }}
-                .a4-page {{ width: 210mm; min-height: 297mm; background: white; padding: 20mm; box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2); position: relative; }}
+                .a4-page {{ width: 210mm; min-height: 297mm; background: white; padding: 20mm; box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2); position: relative; color: black; }}
                 .header {{ border-bottom: 3px solid #0b2e59; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }}
                 .header h1 {{ margin: 0; color: #0b2e59; font-size: 26px; text-transform: uppercase; }}
                 .header h3 {{ margin: 5px 0 0 0; color: #555; font-size: 14px; font-weight: normal; }}
@@ -299,8 +406,8 @@ if nav == "🏠 Área de Trabalho":
             </style>
             </head>
             <body>
-                <div style="width: 210mm;">
-                    <div style="text-align: right;" class="no-print">
+                <div style="width: 210mm; max-width: 100%;">
+                    <div class="no-print">
                         <button class="print-button" onclick="window.print()">🖨️ IMPRIMIR RELATÓRIO</button>
                     </div>
                     <div class="a4-page">
@@ -324,7 +431,7 @@ if nav == "🏠 Área de Trabalho":
                                 <th style="width: 15%;">Resultado</th>
                                 <th style="width: 20%;">Classificação</th>
                             </tr>
-                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center;">Nenhuma avaliação realizada até o momento.</td></tr>'}
+                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333;">Nenhuma avaliação realizada até o momento.</td></tr>'}
                         </table>
                         
                         <div style="font-size: 11px; color: #666; text-align: justify;">
@@ -341,10 +448,11 @@ if nav == "🏠 Área de Trabalho":
             </html>
             """
             
-            # Renderizar o HTML perfeitamente no Streamlit
             components.html(html_relatorio, height=1200, scrolling=True)
 
+# ==========================================
 # HISTÓRICO GERAL
+# ==========================================
 elif nav == "⚙️ Histórico Geral":
     st.title("⚙️ Gerenciamento de Dados")
     if os.path.exists(ARQUIVO_CSV):
@@ -360,3 +468,6 @@ elif nav == "⚙️ Histórico Geral":
             df_g[df_g['Prontuário'] != id_d].to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
             st.success("Registro removido com sucesso."); st.rerun()
     else: st.info("Nenhum dado registrado.")
+
+# Marca d'água invisível que não quebra o layout
+st.markdown("<div class='watermark'>By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
