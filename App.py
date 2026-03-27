@@ -162,8 +162,8 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
     
     st.markdown("""
     <div style='max-width: 900px; margin: 0 auto 35px auto; padding: 25px; background:#fff; border-left:6px solid #b8860b; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.06); text-align: center;'>
-        <p style='font-size:1.3rem; font-style:italic;'>\"O médico deve considerar mais do que um órgão doente, mais até do que o homem inteiro — ele deve ver o homem em seu mundo.\"</p>
-        <p style='color:#b8860b; font-weight:800;'>— HARVEY WILLIAMS CUSHING</p>
+        <p style='font-size:1.35rem; font-style:italic; line-height: 1.6;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p>
+        <p style='color:#b8860b; font-weight:800; letter-spacing: 1px;'>— HARVEY WILLIAMS CUSHING</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -283,4 +283,3 @@ elif nav == "⚙️ Banco de Dados Geral":
         df = pd.read_csv(ARQUIVO_CSV)
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.download_button("📥 Exportar CSV", df.to_csv(index=False).encode('utf-8'), "historico_hugv.csv", "text/csv")
-    else: st.info("Nenhum registro.")
