@@ -9,13 +9,42 @@ import os
 # ==========================================
 st.set_page_config(page_title="NeuroPreditor Harvey", layout="wide", page_icon="🧠")
 
-# Inicialização da memória de sessão
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 if 'ultimo_resultado' not in st.session_state:
     st.session_state.ultimo_resultado = None
 
 ARQUIVO_CSV = "registro_pacientes.csv"
+
+# ==========================================
+# LÓGICA DE APOIO À DECISÃO (TRAFFIC LIGHT)
+# ==========================================
+def obter_conduta_sugerida(modulo, prob, tipo):
+    if modulo == "Prognóstico Visual":
+        if prob >= 60: return "green", "Ótimo prognóstico. Manter plano cirúrgico e alinhar alta expectativa de recuperação visual."
+        elif prob >= 30: return "yellow", "Prognóstico moderado. Alinhar com o paciente que a recuperação pode ser parcial ou lenta."
+        else: return "red", "Baixa probabilidade de melhora. Alinhamento rigoroso de expectativas no pré-op."
+    elif modulo == "Recorrência Cushing":
+        if prob < 20: return "green", "Baixo risco de recorrência. Seguir protocolo padrão de seguimento."
+        elif prob < 45: return "yellow", "Risco moderado. Vigilância apertada de cortisol urinário/salivar no 1º ano."
+        else: return "red", "Alto risco. Considerar RM precoce e avaliação multidisciplinar para terapias adjuvantes."
+    elif modulo == "Risco Fístula LCR":
+        if prob < 10: return "green", "Baixo risco. Técnica de fechamento padrão costuma ser suficiente."
+        elif prob < 20: return "yellow", "Risco moderado. Reforçar reconstrução e considerar repouso absoluto."
+        else: return "red", "ALTO RISCO. Considerar Flap Nasoseptal e avaliação de Dreno Lombar profilático."
+    elif modulo == "Diabetes Insipidus":
+        if prob < 15: return "green", "Baixo risco. Monitorização padrão de balanço hídrico."
+        elif prob < 35: return "yellow", "Risco moderado. Vigilância estrita de densidade urinária e eletrólitos."
+        else: return "red", "Alto risco. Protocolo rigoroso; ter Desmopressina (DDAVP) disponível."
+    elif "DPH" in modulo:
+        if prob < 15: return "green", "Baixo risco. Alta segura com orientações padrão."
+        elif prob < 30: return "yellow", "Risco moderado. Orientar restrição hídrica leve e sódio no 7º POD."
+        else: return "red", "ALTO RISCO. Adiar alta ou garantir coleta de sódio em 48h; orientar sinais de alerta."
+    elif modulo == "Risco Meningite":
+        if prob < 5: return "green", "Baixo risco de infecção. Manter profilaxia antibiótica padrão."
+        elif prob < 15: return "yellow", "Risco moderado. Monitorar rigorosamente febre, rigidez nucal e cefaleia. Avaliar PCR basal."
+        else: return "red", "ALTO RISCO. Manter vigilância neurológica estrita; baixa limiar para punção lombar se sintomas sugestivos."
+    return "gray", ""
 
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
@@ -82,6 +111,15 @@ def risco_recorrencia_cushing_cuper_2025(duracao_sintomas_meses, hardy_grade, lo
     elif pontos_totais <= 120: prob = 40.0 + ((pontos_totais - 100.0) / 20.0) * 25.0
     else: prob = 65.0 + ((pontos_totais - 120.0) / 20.0) * 20.0
     return min(95.0, max(1.0, prob))
+
+def risco_meningite_zhou_2025(duracao_cirurgia_h, diametro_tumor_cm, fistula_intraop):
+    beta_duracao = 0.98
+    beta_diametro = 0.99
+    beta_fistula = 2.22
+    beta_0 = -8.00 # PRECISA DE CALIBRAÇÃO (Estimativa Intercepto)
+    x_fistula = 1 if fistula_intraop else 0
+    logit = beta_0 + (beta_duracao * duracao_cirurgia_h) + (beta_diametro * diametro_tumor_cm) + (beta_fistula * x_fistula)
+    return (1 / (1 + math.exp(-logit))) * 100
 
 # ==========================================
 # GESTÃO DE DADOS (SALVAMENTO)
@@ -195,12 +233,12 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
                 if not pdf.empty:
                     st.session_state.paciente_ativo = {"prontuario": str(bp), "nome": pdf.iloc[0]['Paciente'], "mae": pdf.iloc[0]['Mãe']}
                     st.rerun()
-            st.error("Paciente não encontrado no sistema.")
+            st.error("Paciente não encontrado no histórico.")
     with c2:
         st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
         nn = st.text_input("Nome do Paciente:")
         nm = st.text_input("Nome da Mãe:")
-        np = st.text_input("Nº do Prontuário:")
+        np = st.text_input("Nº Prontuário:")
         if st.button("Cadastrar Paciente"):
             if nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
@@ -213,7 +251,7 @@ if not st.session_state.paciente_ativo['prontuario'] and nav == "🏠 Área de T
 if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuario']:
     st.markdown(f'<div class="patient-header"><div><p style="font-size:0.8rem;opacity:0.8;">PRONTUÁRIO ATIVO</p><h2>👤 {st.session_state.paciente_ativo["nome"]}</h2></div><div><p>Prontuário: {st.session_state.paciente_ativo["prontuario"]}</p></div></div>', unsafe_allow_html=True)
     
-    tabs = st.tabs(["📊 Painel de Resultados", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Hiponatremia"])
+    tabs = st.tabs(["📊 Painel de Resultados", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Hiponatremia", "🦠 Meningite"])
 
     # --- ABA PAINEL (RESUMO) ---
     with tabs[0]:
@@ -260,7 +298,7 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
             v_m = st.number_input("Duração dos sintomas (meses):", 0)
             v_md = st.number_input("MD (dB) pré-op:", 0.0, help="Mean Defect.")
         
-        if st.button("Calcular e Salvar"):
+        if st.button("Calcular e Salvar", key="btn_visao"):
             res = risco_melhora_visual_ji_2023(v_q, v_d, v_m, v_md)
             st.session_state.ultimo_resultado = {"modulo": "Prognóstico Visual", "valor": res, "tipo": "melhora"}
             salvar_registro("Prognóstico Visual", res, "melhora")
@@ -345,7 +383,7 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
             di_h = st.checkbox("Paciente hipertenso?")
             di_ca = st.checkbox("Cardiopatia prévia?")
         with c2: 
-            di_co = st.number_input("Cortisol basal pré-op:", 0.0)
+            di_co = st.number_input("Cortisol basal pré-op (mmol/L):", 0.0)
             di_f = st.toggle("Houve fístula no pós-op?")
             di_r = st.toggle("Textura do tumor rígida?")
         
@@ -384,7 +422,7 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
                 
             with st.expander("📚 Referência Científica"):
                 st.markdown("""
-                **Referência (Vancouver):** Cai X, et al. Predictors and dynamic online nomogram for postoperative delayed hyponatremia after endoscopic transsphenoidal surgery for pituitary adenomas: a single-center, retrospective, observational cohort study with external validation. *Chin Neurosurg J*. 2023;9(1):19.  
+                **Referência (Vancouver):** Cai X, et al. Predictors and dynamic online nomogram for postoperative delayed hyponatremia after endoscopic transsphenoidal surgery for pituitary adenomas. *Chin Neurosurg J*. 2023;9(1):19.  
                 **DOI:** [10.1186/s41016-023-00334-3](https://doi.org/10.1186/s41016-023-00334-3)
                 """)
         else:
@@ -405,6 +443,34 @@ if nav == "🏠 Área de Trabalho" and st.session_state.paciente_ativo['prontuar
         if st.session_state.ultimo_resultado and "DPH" in st.session_state.ultimo_resultado['modulo']:
             st.metric("Risco de Hiponatremia", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
             st.success("Resultado arquivado com sucesso!")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    # --- ABA MENINGITE ---
+    with tabs[6]:
+        st.markdown("<div class='calc-info'><strong>Meningite Pós-operatória:</strong> Estima o risco de infeção do sistema nervoso central baseado em parâmetros cirúrgicos.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: 
+            m_dur = st.number_input("Duração da cirurgia (horas):", 0.0, step=0.5, help="Tempo total do procedimento cirúrgico.")
+            m_fist = st.toggle("Fístula LCR intraoperatória?", help="Presença de vazamento de líquor durante a cirurgia.")
+        with c2: 
+            m_dia = st.number_input("Diâmetro do tumor (cm):", 0.0, step=0.5, help="Maior diâmetro do tumor verificado na ressonância magnética.")
+        
+        if st.button("Calcular e Salvar", key="btn_meningite"):
+            res = risco_meningite_zhou_2025(m_dur, m_dia, m_fist)
+            st.session_state.ultimo_resultado = {"modulo": "Risco Meningite", "valor": res, "tipo": "risco"}
+            salvar_registro("Risco Meningite", res, "risco")
+            st.rerun()
+
+        if st.session_state.ultimo_resultado and st.session_state.ultimo_resultado['modulo'] == "Risco Meningite":
+            st.metric("Risco Calculado", f"{st.session_state.ultimo_resultado['valor']:.1f}%")
+            st.success("Resultado arquivado com sucesso!")
+            
+        with st.expander("📚 Referência Científica"):
+            st.markdown("""
+            **Referência (Vancouver):** Zhou P, Shi J, Long Z, et al. Predictive model for meningitis after pituitary tumor resection by endoscopic nasal trans-sphenoidal sinus approach. *Eur J Med Res*. 2025;30:738.  
+            **DOI:** [10.1186/s40001-025-03016-1](https://doi.org/10.1186/s40001-025-03016-1)
+            """)
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
