@@ -23,7 +23,6 @@ SENHA_CORRETA = "hugv1869"
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
-
 def risco_meningite_zhou_2025(duracao_h, diametro_cm, fistula_intra):
     beta_duracao, beta_diametro, beta_fistula = 0.98, 0.99, 2.22
     beta_0 = -7.50 
@@ -83,17 +82,17 @@ def salvar_registro(mod, prob, tipo, parametros=""):
     return True
 
 # ==========================================
-# ESTILOS CSS INTELIGENTES (DARK/LIGHT MODE)
+# ESTILOS CSS INTELIGENTES E ELEGANTES
 # ==========================================
 st.markdown("""
 <style>
-    /* Uso de variáveis nativas do Streamlit para adaptação Dark/Light Mode automática */
+    /* Estilos Gerais */
     .login-box { 
         background-color: var(--secondary-background-color); 
-        border-radius: 20px; 
-        border: 1px solid rgba(128, 128, 128, 0.2); 
-        padding: 40px; 
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); 
+        border-radius: 24px; 
+        border: 1px solid rgba(128, 128, 128, 0.15); 
+        padding: 50px; 
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15); 
         text-align: center; 
         max-width: 500px; 
         margin: auto; 
@@ -119,57 +118,87 @@ st.markdown("""
         font-weight: 900; 
         font-size: 3.5rem; 
         text-align: center; 
+        letter-spacing: -1px;
     }
     
     .harvey-text { font-family: 'Georgia', serif; font-style: italic; color: #b8860b; margin-left: 10px; }
     
+    /* Cabeçalho do Paciente (Patient ID Card) */
     .patient-header { 
-        background-color: var(--secondary-background-color); 
-        border: 1px solid rgba(128,128,128,0.2); 
-        color: var(--text-color); 
-        padding: 20px; 
-        border-radius: 15px; 
-        margin-bottom: 20px; 
+        background: linear-gradient(135deg, #0b2e59, #1565c0); 
+        color: white; 
+        padding: 25px 35px; 
+        border-radius: 20px; 
+        margin-bottom: 30px; 
         display: flex; 
         justify-content: space-between; 
         align-items: center;
+        box-shadow: 0 10px 30px rgba(11, 46, 89, 0.2);
     }
     
+    /* Estilo Profissional dos Cards de Resultado (Left-Accent Border) */
     .dashboard-card { 
         background-color: var(--secondary-background-color); 
-        border-radius: 15px; 
-        padding: 20px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        text-align: center; 
-        border-top: 6px solid #ddd; 
+        border-radius: 16px; 
+        padding: 24px; 
+        box-shadow: 0 8px 24px rgba(0,0,0,0.06); 
+        text-align: left; 
+        border-left: 8px solid #ddd; 
         color: var(--text-color); 
-        transition: transform 0.2s; 
+        transition: all 0.3s ease; 
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
-    .dashboard-card:hover { transform: translateY(-5px); }
-    .card-value { font-size: 2.8rem; font-weight: 800; margin: 5px 0; }
+    .dashboard-card:hover { 
+        transform: translateY(-4px); 
+        box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+    }
+    .card-value { font-size: 2.5rem; font-weight: 800; margin: 10px 0; line-height: 1; }
     
-    .b-green { border-top-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
-    .b-orange { border-top-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
-    .b-red { border-top-color: #c62828 !important; } .t-red { color: #c62828 !important; }
+    .b-green { border-left-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
+    .b-orange { border-left-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
+    .b-red { border-left-color: #c62828 !important; } .t-red { color: #c62828 !important; }
     
+    /* Formulários e Entradas */
     .input-card { 
         background-color: var(--secondary-background-color); 
-        padding: 30px; 
-        border-radius: 15px; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
-        margin-top: 20px; 
+        padding: 35px; 
+        border-radius: 20px; 
+        box-shadow: 0 8px 30px rgba(0,0,0,0.05); 
+        margin-top: 15px; 
         color: var(--text-color); 
-        border: 1px solid rgba(128, 128, 128, 0.2); 
+        border: 1px solid rgba(128, 128, 128, 0.1); 
     }
     
+    /* Informações de Apoio (Alertas) */
     .calc-info { 
-        background-color: rgba(21, 101, 192, 0.1); 
-        padding: 12px; 
-        border-radius: 8px; 
+        background-color: rgba(21, 101, 192, 0.05); 
+        padding: 16px 20px; 
+        border-radius: 12px; 
         border-left: 5px solid #1565c0; 
-        margin-bottom: 20px; 
+        margin-bottom: 25px; 
         font-size: 0.95rem; 
         color: var(--text-color); 
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    /* Modernização das Abas (Tabs) do Streamlit */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: var(--secondary-background-color);
+        border-radius: 10px 10px 0 0;
+        padding: 10px 24px;
+        border: 1px solid rgba(128,128,128,0.15);
+        border-bottom: none;
+        transition: background-color 0.2s;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #0b2e59, #1565c0);
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -178,16 +207,16 @@ st.markdown("""
 # TELA DE LOGIN
 # ==========================================
 if not st.session_state.autenticado:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<div class='login-box'>", unsafe_allow_html=True)
         st.markdown("<h1 class='main-title' style='font-size: 2.8rem;'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 1rem; opacity: 0.8;'>Acesso Restrito - Hospital Universitário Getúlio Vargas</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 1rem; opacity: 0.8; margin-bottom: 30px;'>Acesso Restrito - Hospital Universitário Getúlio Vargas</p>", unsafe_allow_html=True)
         
-        st.markdown("<br>", unsafe_allow_html=True)
         senha = st.text_input("Senha Institucional:", type="password", placeholder="Insira a senha...")
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("DESBLOQUEAR ACESSO", use_container_width=True):
             if senha == SENHA_CORRETA:
                 st.session_state.autenticado = True
@@ -195,8 +224,9 @@ if not st.session_state.autenticado:
             else: 
                 st.error("Senha incorreta. Tente novamente.")
         
-        st.markdown("<hr style='opacity: 0.2; margin: 25px 0;'>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; opacity: 0.8;'> Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
+        st.markdown("<hr style='opacity: 0.15; margin: 30px 0 20px 0;'>", unsafe_allow_html=True)
+        # Removido o Emoji e ajustado o layout da assinatura
+        st.markdown("<p style='font-size: 0.85rem; font-weight: 600; opacity: 0.7; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
     st.stop()
@@ -215,19 +245,19 @@ with st.sidebar:
     
     if st.session_state.paciente_ativo['prontuario']:
         st.markdown("---")
-        if st.button("❌ Fechar Prontuário Atual", type="primary"):
+        if st.button("❌ Fechar Prontuário Atual", type="primary", use_container_width=True):
             st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
             st.session_state.ultimo_resultado = None
             st.rerun()
 
     st.markdown("---")
     with st.expander("🌓 Tema (Claro/Escuro)"):
-        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito da tela > **Settings** > **Theme**.")
+        st.write("O sistema adapta-se automaticamente. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito > **Settings** > **Theme**.")
     
     st.markdown("<br><p style='text-align: center; font-size: 0.8rem; font-weight: bold; opacity: 0.7;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
     
     st.markdown("---")
-    if st.button("🚪 Sair do Sistema"):
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
         st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
         st.rerun()
@@ -238,7 +268,7 @@ with st.sidebar:
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
         st.markdown("<h1 class='main-title'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<div class='input-card' style='text-align: center;'><p style='font-size:1.2rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='input-card' style='text-align: center;'><p style='font-size:1.2rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
@@ -247,7 +277,8 @@ if nav == "🏠 Área de Trabalho":
                 df_b = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
                 lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.drop_duplicates(subset=['Prontuário']).iterrows()]
                 sel = st.selectbox("Selecione o paciente:", lista)
-                if st.button("Abrir") and sel:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Abrir Prontuário Selecionado", use_container_width=True) and sel:
                     id_p = sel.split(" - ")[0]
                     dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
                     st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
@@ -260,12 +291,25 @@ if nav == "🏠 Área de Trabalho":
             nn = st.text_input("Nome:")
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Prontuário:")
-            if st.button("Cadastrar") and nn and np:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Cadastrar e Iniciar", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f'<div class="patient-header"><div><p style="font-size:0.8rem;opacity:0.8;margin-bottom:0;">PRONTUÁRIO ATIVO</p><h2 style="margin-top:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2></div><div><p style="margin-bottom:0;">Prontuário: <b>{st.session_state.paciente_ativo["prontuario"]}</b></p></div></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="patient-header">
+            <div>
+                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Ativo</p>
+                <h2 style="margin-top:0; margin-bottom:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2>
+            </div>
+            <div style="text-align: right;">
+                <p style="margin-bottom:10px; font-size: 1.1rem;">Prontuário: <b>{st.session_state.paciente_ativo["prontuario"]}</b></p>
+                <button style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; border-radius: 8px; padding: 6px 15px; cursor: pointer; transition: 0.3s;" onclick="window.location.reload();" onmouseover="this.style.background='rgba(255,255,255,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">Trocar Paciente</button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
 
         with tabs[0]: 
@@ -279,7 +323,19 @@ if nav == "🏠 Área de Trabalho":
                     for i, r in df_l.iterrows():
                         v = float(r['Resultado (%)'])
                         _, cor = obter_classificacao(v, r['Tipo'])
-                        st.markdown(f'<div class="dashboard-card b-{cor}"><div style="font-weight:bold; opacity:0.8;">{r["Avaliação Clínica"]}</div><div class="card-value t-{cor}">{v}%</div><div style="font-weight:bold;" class="t-{cor}">{r["Classificação"]}</div><div style="font-size:0.7rem;opacity:0.6;">{r["Data/Hora"]}</div></div><br>', unsafe_allow_html=True)
+                        with cols[i % 3]:
+                            st.markdown(f"""
+                            <div class="dashboard-card b-{cor}">
+                                <div>
+                                    <div style="font-weight:700; opacity:0.8; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">{r["Avaliação Clínica"]}</div>
+                                    <div class="card-value t-{cor}">{v}%</div>
+                                </div>
+                                <div>
+                                    <div style="font-weight:bold; font-size: 1.1rem;" class="t-{cor}">{r["Classificação"]}</div>
+                                    <div style="font-size:0.8rem; opacity:0.6; margin-top: 8px;">{r["Data/Hora"]}</div>
+                                </div>
+                            </div><br>
+                            """, unsafe_allow_html=True)
                 else: st.info("Nenhum cálculo salvo.")
 
         with tabs[1]: 
@@ -327,7 +383,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
-            st.markdown("<div class='input-card'><h4> Hiponatremia (DPH)</h4>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h4>🧂 Hiponatremia (DPH)</h4>", unsafe_allow_html=True)
             mod_h = st.radio("Modelo:", ["Cai (Sangue)", "Tan (RM)"])
             hp12 = st.toggle("Hipo D1-D2?")
             if mod_h == "Cai (Sangue)":
@@ -385,19 +441,19 @@ if nav == "🏠 Área de Trabalho":
             <head>
             <style>
                 body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: transparent; margin: 0; padding: 20px; display: flex; justify-content: center; }}
-                .print-button {{ background: #0b2e59; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; }}
+                .print-button {{ background: #0b2e59; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; transition: 0.3s; }}
                 .print-button:hover {{ background: #1565c0; }}
-                .a4-page {{ width: 210mm; min-height: 297mm; background: white; padding: 20mm; box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2); position: relative; color: black; }}
+                .a4-page {{ width: 210mm; min-height: 297mm; background: white; padding: 20mm; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; color: black; border-radius: 5px; }}
                 .header {{ border-bottom: 3px solid #0b2e59; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }}
-                .header h1 {{ margin: 0; color: #0b2e59; font-size: 26px; text-transform: uppercase; }}
-                .header h3 {{ margin: 5px 0 0 0; color: #555; font-size: 14px; font-weight: normal; }}
-                .patient-box {{ background: #f4f7f6; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 30px; }}
+                .header h1 {{ margin: 0; color: #0b2e59; font-size: 26px; text-transform: uppercase; font-weight: 900; letter-spacing: -1px; }}
+                .header h3 {{ margin: 5px 0 0 0; color: #777; font-size: 14px; font-weight: normal; letter-spacing: 1px; }}
+                .patient-box {{ background: #f8f9fa; border-left: 4px solid #0b2e59; padding: 15px 20px; border-radius: 0 8px 8px 0; margin-bottom: 30px; }}
                 .patient-box p {{ margin: 5px 0; font-size: 14px; color: #333; }}
-                .section-title {{ font-size: 18px; color: #0b2e59; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }}
+                .section-title {{ font-size: 18px; color: #0b2e59; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }}
                 table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; }}
-                th, td {{ border: 1px solid #ddd; padding: 12px; font-size: 13px; }}
-                th {{ background-color: #0b2e59; color: white; text-align: center; font-weight: bold; }}
-                .footer {{ position: absolute; bottom: 20mm; left: 20mm; right: 20mm; border-top: 1px solid #ccc; padding-top: 10px; text-align: center; font-size: 11px; color: #777; }}
+                th, td {{ border-bottom: 1px solid #eee; padding: 14px 12px; font-size: 13px; }}
+                th {{ background-color: #0b2e59; color: white; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }}
+                .footer {{ position: absolute; bottom: 20mm; left: 20mm; right: 20mm; border-top: 1px solid #ddd; padding-top: 15px; text-align: center; font-size: 11px; color: #777; }}
                 @media print {{
                     body {{ background: white; padding: 0; display: block; }}
                     .no-print {{ display: none !important; }}
@@ -426,21 +482,21 @@ if nav == "🏠 Área de Trabalho":
                         <div class="section-title">Sumário de Risco e Parâmetros Analisados</div>
                         <table>
                             <tr>
-                                <th style="width: 20%;">Módulo Clínico</th>
+                                <th style="width: 25%;">Módulo Clínico</th>
                                 <th style="width: 45%;">Parâmetros Inseridos</th>
-                                <th style="width: 15%;">Resultado</th>
-                                <th style="width: 20%;">Classificação</th>
+                                <th style="width: 12%;">Resultado</th>
+                                <th style="width: 18%;">Classificação</th>
                             </tr>
-                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333;">Nenhuma avaliação realizada até o momento.</td></tr>'}
+                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até o momento.</td></tr>'}
                         </table>
                         
-                        <div style="font-size: 11px; color: #666; text-align: justify;">
-                            <b>Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura internacional (Nomogramas). Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado do neurocirurgião ou endocrinologista responsável.
+                        <div style="font-size: 11px; color: #666; text-align: justify; background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 3px solid #ffc107;">
+                            <b style="color: #856404;">Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura internacional (Nomogramas). Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado do neurocirurgião ou endocrinologista responsável.
                         </div>
                         
                         <div class="footer">
-                            <p style="margin: 0;">NeuroPreditor Harvey • HUGV - UFAM</p>
-                            <p style="margin: 5px 0 0 0; font-style: italic;">Made by Vinícius Bacelar Ferreira</p>
+                            <p style="margin: 0; font-weight: bold; color: #333;">NeuroPreditor Harvey • HUGV - UFAM</p>
+                            <p style="margin: 5px 0 0 0; font-style: italic;">Made By Vinícius Bacelar Ferreira</p>
                         </div>
                     </div>
                 </div>
@@ -470,4 +526,4 @@ elif nav == "⚙️ Histórico Geral":
     else: st.info("Nenhum dado registrado.")
 
 # Marca d'água invisível que não quebra o layout
-st.markdown("<div class='watermark'>By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
+st.markdown("<div class='watermark'>Made By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
