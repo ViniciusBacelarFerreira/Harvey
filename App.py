@@ -15,7 +15,7 @@ if 'autenticado' not in st.session_state:
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
-# Variáveis para armazenar o resultado atual na tela sem precisar recarregar a página
+# Variáveis para armazenar o resultado atual na tela sem recarregar a página
 for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res']:
     if mod not in st.session_state:
         st.session_state[mod] = None
@@ -89,94 +89,19 @@ def salvar_registro(mod, prob, tipo, parametros=""):
 # ==========================================
 st.markdown("""
 <style>
-    .login-box { 
-        background-color: var(--secondary-background-color); 
-        border-radius: 24px; 
-        border: 1px solid rgba(128, 128, 128, 0.15); 
-        padding: 50px; 
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15); 
-        text-align: center; 
-        max-width: 500px; 
-        margin: auto; 
-        color: var(--text-color);
-    }
-    
-    .watermark { 
-        position: fixed; 
-        bottom: 20px; 
-        right: 30px; 
-        opacity: 0.5; 
-        font-family: 'Georgia', serif; 
-        font-style: italic; 
-        font-size: 0.9rem; 
-        pointer-events: none; 
-        color: var(--text-color); 
-    }
-    
-    .main-title { 
-        background: -webkit-linear-gradient(45deg, #1565c0, #b8860b); 
-        -webkit-background-clip: text; 
-        -webkit-text-fill-color: transparent; 
-        font-weight: 900; 
-        font-size: 3.5rem; 
-        text-align: center; 
-        letter-spacing: -1px;
-    }
-    
+    .login-box { background-color: var(--secondary-background-color); border-radius: 24px; border: 1px solid rgba(128, 128, 128, 0.15); padding: 50px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15); text-align: center; max-width: 500px; margin: auto; color: var(--text-color); }
+    .watermark { position: fixed; bottom: 20px; right: 30px; opacity: 0.5; font-family: 'Georgia', serif; font-style: italic; font-size: 0.9rem; pointer-events: none; color: var(--text-color); }
+    .main-title { background: -webkit-linear-gradient(45deg, #1565c0, #b8860b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; font-size: 3.5rem; text-align: center; letter-spacing: -1px; }
     .harvey-text { font-family: 'Georgia', serif; font-style: italic; color: #b8860b; margin-left: 10px; }
-    
-    .patient-header { 
-        background: linear-gradient(135deg, #0b2e59, #1565c0); 
-        color: white; 
-        padding: 25px 35px; 
-        border-radius: 20px; 
-        margin-bottom: 30px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-        box-shadow: 0 10px 30px rgba(11, 46, 89, 0.2);
-    }
-    
-    .dashboard-card { 
-        background-color: var(--secondary-background-color); 
-        border-radius: 16px; 
-        padding: 24px; 
-        box-shadow: 0 8px 24px rgba(0,0,0,0.06); 
-        text-align: left; 
-        border-left: 8px solid #ddd; 
-        color: var(--text-color); 
-        transition: all 0.3s ease; 
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
+    .patient-header { background: linear-gradient(135deg, #0b2e59, #1565c0); color: white; padding: 25px 35px; border-radius: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(11, 46, 89, 0.2); }
+    .dashboard-card { background-color: var(--secondary-background-color); border-radius: 16px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); text-align: left; border-left: 8px solid #ddd; color: var(--text-color); transition: all 0.3s ease; display: flex; flex-direction: column; justify-content: space-between; }
     .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); }
     .card-value { font-size: 2.5rem; font-weight: 800; margin: 10px 0; line-height: 1; }
-    
     .b-green { border-left-color: #2e7d32 !important; } .t-green { color: #2e7d32 !important; }
     .b-orange { border-left-color: #ef6c00 !important; } .t-orange { color: #ef6c00 !important; }
     .b-red { border-left-color: #c62828 !important; } .t-red { color: #c62828 !important; }
-    
-    .input-card { 
-        background-color: var(--secondary-background-color); 
-        padding: 35px; 
-        border-radius: 20px; 
-        box-shadow: 0 8px 30px rgba(0,0,0,0.05); 
-        margin-top: 15px; 
-        color: var(--text-color); 
-        border: 1px solid rgba(128, 128, 128, 0.1); 
-    }
-    
-    .calc-info { 
-        background-color: rgba(21, 101, 192, 0.05); 
-        padding: 16px 20px; 
-        border-radius: 12px; 
-        border-left: 5px solid #1565c0; 
-        margin-bottom: 25px; 
-        font-size: 0.95rem; 
-        color: var(--text-color); 
-        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-    }
+    .input-card { background-color: var(--secondary-background-color); padding: 35px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-top: 15px; color: var(--text-color); border: 1px solid rgba(128, 128, 128, 0.1); }
+    .calc-info { background-color: rgba(21, 101, 192, 0.05); padding: 16px 20px; border-radius: 12px; border-left: 5px solid #1565c0; margin-bottom: 25px; font-size: 0.95rem; color: var(--text-color); box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -244,7 +169,6 @@ if nav == "🏠 Área de Trabalho":
         st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias (fístulas, diabetes insipidus, hiponatremia e meningite) em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
         
         st.markdown("<div class='input-card' style='text-align: center; padding: 25px;'><p style='font-size:1.15rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
-        
         st.markdown("<br>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
@@ -290,7 +214,6 @@ if nav == "🏠 Área de Trabalho":
         
         tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
 
-        # Usando placeholders para permitir que o Painel e Relatório sejam preenchidos no final (após os cálculos)
         painel_placeholder = tabs[0].empty()
         relatorio_placeholder = tabs[7].empty()
 
@@ -325,12 +248,23 @@ if nav == "🏠 Área de Trabalho":
         with tabs[2]: 
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Utiliza o Modelo CuPeR para prever o risco de persistência ou recorrência da Doença de Cushing a longo prazo.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🔄 Doença de Cushing</h4>", unsafe_allow_html=True)
+            
+            # Texto em Markdown formatado para o popup de ajuda
+            help_hardy = """
+            **Classificação Radiológica de Hardy (Grau de Invasão):**
+            * **Grau 0:** Sela túrcica intacta e de aspecto normal.
+            * **Grau 1:** Microadenoma (<10 mm); sela intacta, podendo ter assimetria ou abaulamento focal no assoalho.
+            * **Grau 2:** Macroadenoma (≥10 mm); sela alargada globalmente, mas com o assoalho ósseo ainda intacto.
+            * **Grau 3:** Tumor invasivo; erosão óssea localizada ou destruição parcial do assoalho selar.
+            * **Grau 4:** Destruição difusa e extensa do assoalho da sela túrcica ou invasão da base do crânio (Phantom Sella).
+            """
+            
             c1, c2 = st.columns(2)
             with c1: 
                 c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1", help="Tempo de exposição clínica documentada aos sinais/sintomas do hipercortisolismo.")
-                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?", help="Se a cirurgia atual for um reabordagem, o risco de falha aumenta significativamente.")
+                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?", help="Se a cirurgia atual for uma reabordagem, o risco de falha aumenta significativamente.")
             with c2: 
-                c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2, help="Grau 0-1: Microadenomas intrasselares. Grau 2: Macroadenoma selar. Grau 3-4: Destruição do assoalho ou invasão óssea extensa.")
+                c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2, help=help_hardy)
                 c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"], help="Baseado na interpretação da Ressonância Dinâmica da Sela Túrcica.")
             
             if st.button("Calcular e Salvar Risco de Recorrência", key="btn_cushing"):
@@ -353,10 +287,20 @@ if nav == "🏠 Área de Trabalho":
         with tabs[3]: 
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) durante o período pós-operatório imediato e mediato.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>💧 Fístula de Líquor</h4>", unsafe_allow_html=True)
+            
+            # Texto em Markdown formatado para o popup de ajuda
+            help_kelly = """
+            **Grau de Kelly (Vazamento Intraoperatório de LCR):**
+            * **Grau 0:** Nenhuma fístula liquórica observada.
+            * **Grau 1:** Fístula pequena (apenas 'gotejamento', umidade ou transudação) sem um defeito dural claro ou óbvio.
+            * **Grau 2:** Fístula moderada com fluxo claro e ativo de líquor através de um defeito definitivo e óbvio no diafragma selar/dura-máter.
+            * **Grau 3:** Fístula de alto fluxo (grande defeito dural, exposição ampla de cisternas basais ou abertura do 3º ventrículo).
+            """
+            
             f1, f2 = st.columns(2)
             with f1: 
-                f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help="Grau 0: Nenhuma fístula. Grau 1: Fístula pequena/gotejamento. Grau 2-3: Fístula moderada a grande, com defeito aracnoideo claro.")
-                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
+                f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help=help_kelly)
+                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
             with f2: 
                 f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Grau 3 significa volume de ar intracraniano considerável indicando comunicação ampla do espaço subaracnoideo.")
                 f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia/abertura do assoalho selar (osso esfenoidal) realizada pelo cirurgião.")
@@ -379,17 +323,17 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[4]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Prediz a chance do paciente desenvolver Diabetes Insipidus central no pós-operatório devido à manipulação da neurohipófise ou haste.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Prediz a chance do paciente desenvolver Diabetes Insipidus central no pós-operatório devido à manipulação da neuro-hipófise ou haste.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
             d1, d2 = st.columns(2)
             with d1: 
-                di_d = st.checkbox("O paciente possui Diabetes Mellitus prévio?")
-                di_h = st.checkbox("O paciente possui Hipertensão Arterial Sistêmica?")
-                di_ca = st.checkbox("O paciente possui Cardiopatia prévia?")
+                di_d = st.checkbox("Paciente possui Diabetes Mellitus prévio?")
+                di_h = st.checkbox("Paciente possui Hipertensão Arterial Sistêmica?")
+                di_ca = st.checkbox("Paciente possui Cardiopatia prévia?")
             with d2: 
-                di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0, help="Nível de cortisol obtido preferencialmente às 8h da manhã.")
+                di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0, help="Nível de cortisol sérico obtido preferencialmente às 8h da manhã.")
                 di_f = st.toggle("Apresentou fístula liquórica documentada no pós-operatório?")
-                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?", help="Tumores duros exigem maior tração e curetagem, aumentando o risco mecânico para a haste hipofisária.")
+                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?", help="Tumores duros exigem maior tração e curetagem, aumentando o risco mecânico e a manipulação adjacente à haste hipofisária.")
             
             if st.button("Calcular e Salvar Risco de D.I.", key="btn_di"):
                 res = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
@@ -409,13 +353,13 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (Delayed Postoperative Hyponatremia - DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (Delayed Postoperative Hyponatremia - DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório (fase secundária de SIADH).</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🧂 Hiponatremia Tardia (DPH)</h4>", unsafe_allow_html=True)
             mod_h = st.radio("Selecione a base do modelo preditivo:", ["Modelo de Sangue (Cai et al.)", "Modelo de Imagem/Hormonal (Tan et al.)"])
-            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?", help="Sódio em declínio na fase aguda, preditor forte de fase secundária de SIADH tardia.")
+            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?", help="Sódio em declínio na fase aguda é um preditor clínico muito forte do desenvolvimento de SIADH tardia.")
             
             if mod_h == "Modelo de Sangue (Cai et al.)":
-                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0, help="O valor de monócitos relativos obtidos no hemograma de rotina pós-operatório.")
+                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0, help="O valor de monócitos relativos obtidos no hemograma de rotina no pós-operatório.")
                 pt = st.number_input("Tempo de Protrombina (segundos):", 0.0, help="Tempo de coagulação em segundos (PT/TAP).")
                 if st.button("Calcular e Salvar Risco (Modelo Cai)", key="btn_hipo_cai"):
                     res = risco_pdh_cai_2023(hp12, mo, pt)
@@ -424,7 +368,7 @@ if nav == "🏠 Área de Trabalho":
                     salvar_registro("DPH (Modelo Cai)", res, "risco", params)
             else:
                 pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0, help="Nível sérico medido no sangue antes da cirurgia.")
-                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0, help="Elevação do diafragma selar acima da linha basilar na RM sagital/coronal.")
+                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0, help="Elevação do diafragma selar medido acima da linha basilar na RM sagital ou coronal.")
                 if st.button("Calcular e Salvar Risco (Modelo Tan)", key="btn_hipo_tan"):
                     res = risco_pdh_tan_2025(pr, dia, hp12)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina pré-op: {pr} ng/mL | Elevação Diafragma: {dia} mm"
@@ -446,14 +390,14 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[6]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de meningite bacteriana pós-operatória baseado em dados anatômicos e cirúrgicos intraoperatórios.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de meningite bacteriana pós-operatória baseado em dados anatômicos e variáveis cirúrgicas.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🦠 Meningite Pós-operatória</h4>", unsafe_allow_html=True)
             m1, m2 = st.columns(2)
             with m1: 
-                md = st.number_input("Duração total da Cirurgia (horas):", 0.0, help="Tempo cirúrgico prolongado aumenta exponencialmente o risco de contaminação e meningite (OR 2.68).")
-                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?", help="Vazamento de líquor durante a cirurgia é o principal preditor independente (aumenta o risco em ~9 vezes).")
+                md = st.number_input("Duração total da Cirurgia (horas):", 0.0, help="Tempo cirúrgico prolongado aumenta exponencialmente o risco de contaminação cruzada e meningite (OR 2.68).")
+                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?", help="Vazamento de líquor durante a cirurgia é o principal preditor independente (aumenta o risco em ~9 vezes, OR 9.19).")
             with m2: 
-                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0, help="A cada 1cm adicional no tamanho do tumor o risco aumenta em 2.7x, devido à maior complexidade de ressecção e área de exposição.")
+                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0, help="A cada 1 cm adicional no tamanho do tumor o risco de infecção aumenta em 2.7x, devido à maior complexidade da ressecção e maior área de exposição dural.")
             
             if st.button("Calcular e Salvar Risco de Meningite", key="btn_meningite"):
                 res = risco_meningite_zhou_2025(md, mt, mf)
@@ -473,7 +417,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
             
         # =======================================================
-        # PREENCHIMENTO DOS PLACEHOLDERS (LENDO O ARQUIVO ATUALIZADO)
+        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA)
         # =======================================================
         
         with painel_placeholder.container():
@@ -505,7 +449,7 @@ if nav == "🏠 Área de Trabalho":
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
-            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema.")
+            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações da impressora do seu navegador, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores institucionais do cabeçalho.")
             
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
