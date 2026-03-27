@@ -8,7 +8,7 @@ import os
 # ==========================================
 # CONFIGURAÇÃO INICIAL E ESTADO DA SESSÃO
 # ==========================================
-st.set_page_config(page_title="NeuroPreditor Transesfenoidal Harvey", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="NeuroPreditor Harvey", layout="wide", page_icon="🧠")
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
@@ -240,12 +240,16 @@ with st.sidebar:
 # ==========================================
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
-        st.markdown("<h1 class='main-title'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<div class='input-card' style='text-align: center;'><p style='font-size:1.2rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
+        st.markdown("<h1 class='main-title'>NeuroPreditor Transesfenoidal <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias (fístulas, diabetes insipidus, hiponatremia e meningite) em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='input-card' style='text-align: center; padding: 25px;'><p style='font-size:1.15rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
             if os.path.exists(ARQUIVO_CSV):
                 df_b = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
                 lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.drop_duplicates(subset=['Prontuário']).iterrows()]
@@ -260,15 +264,16 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
             
         with c2:
-            st.markdown("<div class='input-card'><h3>➕ Novo Paciente</h3>", unsafe_allow_html=True)
-            nn = st.text_input("Nome:")
+            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Paciente</h3>", unsafe_allow_html=True)
+            nn = st.text_input("Nome Completo do Paciente:")
             nm = st.text_input("Nome da Mãe:")
-            np = st.text_input("Prontuário:")
+            np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+            
     else:
         st.markdown(f"""
         <div class="patient-header">
@@ -285,32 +290,9 @@ if nav == "🏠 Área de Trabalho":
         
         tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
 
-        with tabs[0]: 
-            st.subheader("📊 Resultados Consolidados")
-            st.info("Para atualizar este painel com novos cálculos, clique noutra aba e volte aqui, ou gere o Relatório A4.")
-            if os.path.exists(ARQUIVO_CSV):
-                df_h = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-                df_p = df_h[df_h['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
-                if not df_p.empty:
-                    df_l = df_p.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
-                    cols = st.columns(3)
-                    for i, r in df_l.iterrows():
-                        v = float(r['Resultado (%)'])
-                        _, cor = obter_classificacao(v, r['Tipo'])
-                        with cols[i % 3]:
-                            st.markdown(f"""
-                            <div class="dashboard-card b-{cor}">
-                                <div>
-                                    <div style="font-weight:700; opacity:0.8; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">{r["Avaliação Clínica"]}</div>
-                                    <div class="card-value t-{cor}">{v}%</div>
-                                </div>
-                                <div>
-                                    <div style="font-weight:bold; font-size: 1.1rem;" class="t-{cor}">{r["Classificação"]}</div>
-                                    <div style="font-size:0.8rem; opacity:0.6; margin-top: 8px;">{r["Data/Hora"]}</div>
-                                </div>
-                            </div><br>
-                            """, unsafe_allow_html=True)
-                else: st.info("Nenhum cálculo salvo para este paciente.")
+        # Usando placeholders para permitir que o Painel e Relatório sejam preenchidos no final (após os cálculos)
+        painel_placeholder = tabs[0].empty()
+        relatorio_placeholder = tabs[7].empty()
 
         with tabs[1]: 
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima a probabilidade de melhora visual ou recuperação do campo visual do paciente após a descompressão cirúrgica.</div>", unsafe_allow_html=True)
@@ -490,10 +472,40 @@ if nav == "🏠 Área de Trabalho":
                 """)
             st.markdown("</div>", unsafe_allow_html=True)
             
-        # --- RELATÓRIO A4 HTML IMPRIMÍVEL ---
-        with tabs[7]:
-            st.markdown("### 🖨️ Relatório Médico Oficial (Formato A4)")
-            st.info("Clique no botão abaixo para imprimir. Nas configurações da impressora do seu navegador, marque a caixa **'Gráficos de segundo plano'** para imprimir as cores institucionais.")
+        # =======================================================
+        # PREENCHIMENTO DOS PLACEHOLDERS (LENDO O ARQUIVO ATUALIZADO)
+        # =======================================================
+        
+        with painel_placeholder.container():
+            st.subheader("📊 Resultados Consolidados e Arquivados")
+            if os.path.exists(ARQUIVO_CSV):
+                df_h = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+                df_p = df_h[df_h['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
+                if not df_p.empty:
+                    df_l = df_p.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
+                    cols = st.columns(3)
+                    for i, r in df_l.iterrows():
+                        v = float(r['Resultado (%)'])
+                        _, cor = obter_classificacao(v, r['Tipo'])
+                        with cols[i % 3]:
+                            st.markdown(f"""
+                            <div class="dashboard-card b-{cor}">
+                                <div>
+                                    <div style="font-weight:700; opacity:0.8; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">{r["Avaliação Clínica"]}</div>
+                                    <div class="card-value t-{cor}">{v}%</div>
+                                </div>
+                                <div>
+                                    <div style="font-weight:bold; font-size: 1.1rem;" class="t-{cor}">{r["Classificação"]}</div>
+                                    <div style="font-size:0.8rem; opacity:0.6; margin-top: 8px;">{r["Data/Hora"]}</div>
+                                </div>
+                            </div><br>
+                            """, unsafe_allow_html=True)
+                else: 
+                    st.info("Nenhum cálculo salvo ainda. Realize as avaliações nas abas acima.")
+                    
+        with relatorio_placeholder.container():
+            st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
+            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema.")
             
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
@@ -570,7 +582,7 @@ if nav == "🏠 Área de Trabalho":
                         </table>
                         
                         <div style="font-size: 11px; color: #666; text-align: justify; background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 3px solid #ffc107;">
-                            <b style="color: #856404;">Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura científica. Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado do especialista responsável.
+                            <b style="color: #856404;">Aviso Clínico:</b> Este documento reflete as estimativas de probabilidade baseadas nos dados inseridos e em modelos preditivos validados na literatura científica. Estes resultados destinam-se a apoiar a tomada de decisão médica e não substituem o julgamento clínico individualizado.
                         </div>
                         
                         <div class="footer">
