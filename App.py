@@ -26,14 +26,14 @@ ARQUIVO_CSV = "registro_pacientes.csv"
 SENHA_CORRETA = "hugv1869"
 
 # ==========================================
-# FUNÇÕES DE XAI (EXPLICABILIDADE) E GRÁFICOS
+# FUNÇÕES DE XAI (EXPLICABILIDADE E GRÁFICOS)
 # ==========================================
 def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Modelo Matemático)"):
     labels = list(contribuicoes.keys())
     values = list(contribuicoes.values())
     
     measures = ["relative"] * len(labels)
-    labels.append("Resultado Final (Logit/Pontos)")
+    labels.append("Resultado Final (Logit)")
     values.append(sum(values))
     measures.append("total")
     
@@ -45,15 +45,15 @@ def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Model
         text=[f"{v:+.2f}" if m == "relative" else f"{v:.2f}" for m, v in zip(measures, values)],
         y=values,
         connector={"line":{"color":"rgba(128,128,128,0.5)"}},
-        decreasing={"marker":{"color":"#1565c0"}}, # Azul para redução de risco
-        increasing={"marker":{"color":"#ef6c00"}}, # Laranja para aumento de risco
-        totals={"marker":{"color":"#333333"}}      # Cinzento escuro para o total
+        decreasing={"marker":{"color":"#1565c0"}}, 
+        increasing={"marker":{"color":"#ef6c00"}}, 
+        totals={"marker":{"color":"#333333"}}      
     ))
     
     fig.update_layout(
         title={"text": titulo, "font": {"size": 14}},
         showlegend=False,
-        height=350,
+        height=320,
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -61,19 +61,48 @@ def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Model
     )
     return fig
 
+def gerar_grafico_velocimetro(prob, tipo="risco"):
+    if tipo == "melhora":
+        steps = [
+            {'range': [0, 30], 'color': "rgba(198, 40, 40, 0.8)"},   # Vermelho
+            {'range': [30, 60], 'color': "rgba(239, 108, 0, 0.8)"},  # Laranja
+            {'range': [60, 100], 'color': "rgba(46, 125, 50, 0.8)"}  # Verde
+        ]
+        title = "Probabilidade"
+    else:
+        steps = [
+            {'range': [0, 15], 'color': "rgba(46, 125, 50, 0.8)"},   # Verde
+            {'range': [15, 30], 'color': "rgba(239, 108, 0, 0.8)"},  # Laranja
+            {'range': [30, 100], 'color': "rgba(198, 40, 40, 0.8)"}  # Vermelho
+        ]
+        title = "Nível de Risco"
+
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=prob,
+        number={'suffix': "%", 'font': {'size': 40, 'color': '#333'}},
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': title, 'font': {'size': 18, 'color': '#555'}},
+        gauge={
+            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+            'bar': {'color': "rgba(0, 0, 0, 0.8)", 'thickness': 0.15},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': steps,
+        }
+    ))
+    fig.update_layout(height=320, margin=dict(l=20, r=20, t=50, b=20), paper_bgcolor='rgba(0,0,0,0)')
+    return fig
+
 def obter_texto_explicativo(contribuicoes):
-    # Remove o risco base para encontrar a variável clínica mais impactante
     contribs_clinicas = {k: v for k, v in contribuicoes.items() if "Base" not in k}
     if not contribs_clinicas: return ""
-    
     max_var = max(contribs_clinicas, key=lambda k: abs(contribs_clinicas[k]))
     max_val = contribs_clinicas[max_var]
-    
-    if max_val == 0:
-        return "Nenhum fator de risco adicional pontuou neste doente."
-        
+    if max_val == 0: return "Nenhum fator de risco adicional pontuou neste paciente."
     acao = "aumentou" if max_val > 0 else "reduziu"
-    return f"A variável clínica que mais **{acao}** o risco neste doente foi: **{max_var}** (Impacto estatístico: {max_val:+.2f})."
+    return f"A variável clínica que mais **{acao}** a probabilidade neste paciente foi: **{max_var}** (Impacto no Logit: {max_val:+.2f})."
 
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END COM XAI)
@@ -188,10 +217,8 @@ def risco_recorrencia_cushing_cuper_2025(meses, hardy, local, previa):
     loc_map = {'direita': 14, 'central': 18, 'esquerda': 22, 'haste': 33}
     c_loc = loc_map.get(local.lower(), 0)
     pontos = c_mes + c_har + c_prev + c_loc
-    if pontos <= 60: 
-        prob = (pontos/60)*10
-    else:
-        prob = min(95.0, 10 + (pontos-60)*0.75)
+    if pontos <= 60: prob = (pontos/60)*10
+    else: prob = min(95.0, 10 + (pontos-60)*0.75)
     contribs = {"Base": 0, "Duração Sintomas": c_mes, "Grau Hardy": c_har, "Cirurgia Prévia": c_prev, "Localização": c_loc}
     return prob, contribs
 
@@ -217,7 +244,7 @@ def salvar_registro(mod, prob, tipo, parametros=""):
     if os.path.exists(ARQUIVO_CSV):
         df_e = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
         if 'Parâmetros Inseridos' not in df_e.columns:
-            df_e['Parâmetros Inseridos'] = "Dados antigos não registados"
+            df_e['Parâmetros Inseridos'] = "Dados antigos não registrados"
         pd.concat([df_e, novo], ignore_index=True).to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
     else: 
         novo.to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
@@ -288,7 +315,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     if st.session_state.paciente_ativo['prontuario']:
-        st.markdown("<div class='sidebar-section-title'>Doente em Consulta</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-section-title'>Paciente em Consulta</div>", unsafe_allow_html=True)
         st.markdown(f"""
         <div class="sidebar-patient-card">
             <div style="font-size: 0.8rem; color: var(--text-color); opacity: 0.7;">Prontuário: <b>{st.session_state.paciente_ativo['prontuario']}</b></div>
@@ -305,7 +332,7 @@ with st.sidebar:
 
     st.markdown("<div class='sidebar-section-title'>Sistema</div>", unsafe_allow_html=True)
     with st.expander("🌓 Tema (Claro/Escuro)"):
-        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito do ecrã > **Settings** > **Theme**.")
+        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito da tela > **Settings** > **Theme**.")
     
     if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
@@ -327,23 +354,23 @@ if nav == "🏠 Área de Trabalho":
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("<div class='input-card'><h3>🔍 Aceder a Prontuário Antigo</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
             if os.path.exists(ARQUIVO_CSV):
                 df_b = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
                 lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.drop_duplicates(subset=['Prontuário']).iterrows()]
-                sel = st.selectbox("Selecione o doente:", lista)
+                sel = st.selectbox("Selecione o paciente:", lista)
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("Abrir Prontuário Selecionado", use_container_width=True) and sel:
                     id_p = sel.split(" - ")[0]
                     dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
                     st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
                     st.rerun()
-            else: st.info("Sem registos no momento.")
+            else: st.info("Sem registros no momento.")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with c2:
-            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Doente</h3>", unsafe_allow_html=True)
-            nn = st.text_input("Nome Completo do Doente:")
+            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Paciente</h3>", unsafe_allow_html=True)
+            nn = st.text_input("Nome Completo do Paciente:")
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
@@ -356,7 +383,7 @@ if nav == "🏠 Área de Trabalho":
         st.markdown(f"""
         <div class="patient-header">
             <div>
-                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Eletrónico Ativo</p>
+                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Eletrônico Ativo</p>
                 <h2 style="margin-top:0; margin-bottom:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2>
             </div>
             <div style="text-align: right;">
@@ -391,11 +418,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.visao_res is not None:
                 res, contribs = st.session_state.visao_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Probabilidade Calculada", f"{res:.1f}%")
                 
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "melhora"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
                 
             with st.expander("📚 Referência Científica"):
                 st.markdown("**Ji X, Zhuang X, Yang S, et al.** Visual field improvement after endoscopic transsphenoidal surgery... *Front Oncol*. 2023;13:1108883.")
@@ -407,7 +437,7 @@ if nav == "🏠 Área de Trabalho":
             c1, c2 = st.columns(2)
             with c1: 
                 c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1")
-                c_cp = st.toggle("O doente possui cirurgia pituitária prévia?")
+                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?")
             with c2: 
                 c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2)
                 c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"])
@@ -421,11 +451,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.cushing_res is not None:
                 res, contribs = st.session_state.cushing_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
                 
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
                 
             with st.expander("📚 Referência Científica"):
                 st.markdown("**Sharifi G, Paraandavaji E, et al.** The CuPeR model: A dynamic online tool... *J Clin Transl Endocrinol*. 2025;41:100417.")
@@ -450,10 +483,14 @@ if nav == "🏠 Área de Trabalho":
                 if st.session_state.fistula_intra_res is not None:
                     res, contribs = st.session_state.fistula_intra_res
                     st.success("Cálculo intraoperatório salvo com sucesso!")
-                    st.metric("Risco Calculado", f"{res:.1f}%")
-                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                    st.markdown(obter_texto_explicativo(contribs))
-                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                    
+                    col_g, col_x = st.columns([1, 1.5])
+                    with col_g:
+                        st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                    with col_x:
+                        st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                        st.markdown(obter_texto_explicativo(contribs))
+                        st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
 
             with sub_tabs_fistula[1]:
                 f1, f2 = st.columns(2)
@@ -473,10 +510,14 @@ if nav == "🏠 Área de Trabalho":
                 if st.session_state.fistula_res is not None:
                     res, contribs = st.session_state.fistula_res
                     st.success("Cálculo pós-operatório salvo com sucesso!")
-                    st.metric("Risco Calculado", f"{res:.1f}%")
-                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                    st.markdown(obter_texto_explicativo(contribs))
-                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                    
+                    col_g, col_x = st.columns([1, 1.5])
+                    with col_g:
+                        st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                    with col_x:
+                        st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                        st.markdown(obter_texto_explicativo(contribs))
+                        st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[4]: 
@@ -484,9 +525,9 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
             d1, d2 = st.columns(2)
             with d1: 
-                di_d = st.checkbox("O doente possui Diabetes Mellitus prévio?")
-                di_h = st.checkbox("O doente possui Hipertensão Arterial Sistémica?")
-                di_ca = st.checkbox("O doente possui Cardiopatia prévia?")
+                di_d = st.checkbox("O paciente possui Diabetes Mellitus prévio?")
+                di_h = st.checkbox("O paciente possui Hipertensão Arterial Sistêmica?")
+                di_ca = st.checkbox("O paciente possui Cardiopatia prévia?")
             with d2: 
                 di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0)
                 di_f = st.toggle("Apresentou fístula liquórica documentada no pós-operatório?")
@@ -501,10 +542,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.di_res is not None:
                 res, contribs = st.session_state.di_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
@@ -514,7 +559,7 @@ if nav == "🏠 Área de Trabalho":
             hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?")
             
             if mod_h == "Modelo de Sangue (Cai et al.)":
-                mo = st.number_input("Percentagem de Monócitos no hemograma (%):", 0.0)
+                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0)
                 pt = st.number_input("Tempo de Protrombina (segundos):", 0.0)
                 if st.button("Calcular e Salvar Risco", key="btn_hipo_cai"):
                     res, contribs = risco_pdh_cai_2023(hp12, mo, pt)
@@ -533,10 +578,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.hipo_res is not None:
                 res, contribs = st.session_state.hipo_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[6]: 
@@ -558,10 +607,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.meningite_res is not None:
                 res, contribs = st.session_state.meningite_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with tabs[7]: 
@@ -571,7 +624,7 @@ if nav == "🏠 Área de Trabalho":
             with ch1:
                 chen_res_op = st.selectbox("Extensão da Ressecção Cirúrgica:", ["Ressecção Total (GTR > 95%)", "Ressecção Quase Total (NTR 90-95%)", "Ressecção Subtotal (STR 70-90%)", "Ressecção Parcial (PR < 70%)"])
                 chen_knosp = st.selectbox("Classificação de Knosp (RM Pré-op):", ["Graus 0 - 1", "Graus 2 - 3", "Grau 4"])
-                chen_tabagismo = st.toggle("O doente possui histórico de tabagismo?")
+                chen_tabagismo = st.toggle("O paciente possui histórico de tabagismo?")
             with ch2:
                 chen_ki67 = st.toggle("Índice de proliferação tumoral Ki-67 ≥ 3%?")
                 chen_bmi = st.toggle("Índice de Massa Corporal (IMC) ≥ 25 kg/m²?")
@@ -585,10 +638,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.chen_res is not None:
                 res, contribs = st.session_state.chen_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with tabs[8]: 
@@ -596,7 +653,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='input-card'><h4>🧬 Acromegalia (Remissão)</h4>", unsafe_allow_html=True)
             ac1, ac2 = st.columns(2)
             with ac1:
-                acro_idade = st.number_input("Idade do doente no diagnóstico (anos):", 0)
+                acro_idade = st.number_input("Idade do paciente no diagnóstico (anos):", 0)
                 acro_diam = st.number_input("Diâmetro máximo do tumor na RM (cm):", 0.0, step=0.1)
                 acro_knosp = st.selectbox("Classificação de Knosp:", ["Grau 0", "Grau 1", "Grau 2", "Grau 3A", "Grau 3B", "Grau 4"])
             with ac2:
@@ -612,19 +669,23 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.acro_res is not None:
                 res, contribs = st.session_state.acro_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Chance de Remissão Calculada", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "melhora"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[9]:
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de <b>recorrência ou progressão tumoral</b> a longo prazo para doentes do <b>sexo masculino</b> com NFPA.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de <b>recorrência ou progressão tumoral</b> a longo prazo para pacientes do <b>sexo masculino</b> com NFPA.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>📉 Recidiva em NFPA (Homens)</h4>", unsafe_allow_html=True)
             nf1, nf2 = st.columns(2)
             with nf1:
                 nfpa_knosp = st.toggle("A Classificação de Knosp Modificada é Grau 3B ou 4?")
-                nfpa_ki67 = st.toggle("O Índice de proliferação Ki-67 é ≥ 3%?")
+                nfpa_ki67 = st.toggle("O Índice de proliferação Ki-67 é ≥ 3?")
             with nf2:
                 nfpa_res = st.selectbox("Extensão da Ressecção Cirúrgica:", ["Ressecção Total (GTR)", "Ressecção Subtotal/Parcial (STR/PR)"])
                 
@@ -638,10 +699,14 @@ if nav == "🏠 Área de Trabalho":
             if st.session_state.nfpa_res is not None:
                 res, contribs = st.session_state.nfpa_res
                 st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{res:.1f}%")
-                st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
-                st.markdown(obter_texto_explicativo(contribs))
-                st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+                
+                col_g, col_x = st.columns([1, 1.5])
+                with col_g:
+                    st.plotly_chart(gerar_grafico_velocimetro(res, "risco"), use_container_width=True)
+                with col_x:
+                    st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
+                    st.markdown(obter_texto_explicativo(contribs))
+                    st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         # =======================================================
@@ -725,8 +790,8 @@ if nav == "🏠 Área de Trabalho":
                             <h3>NeuroPreditor Harvey - Relatório de Avaliação Preditiva</h3>
                         </div>
                         <div class="patient-box">
-                            <p><b>Doente:</b> {st.session_state.paciente_ativo['nome']}</p>
-                            <p><b>Registo / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
+                            <p><b>Paciente:</b> {st.session_state.paciente_ativo['nome']}</p>
+                            <p><b>Registro / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
                             <p><b>Nome da Mãe:</b> {st.session_state.paciente_ativo['mae']}</p>
                             <p><b>Data da Emissão:</b> {datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")}</p>
                         </div>
@@ -738,7 +803,7 @@ if nav == "🏠 Área de Trabalho":
                                 <th style="width: 12%;">Resultado</th>
                                 <th style="width: 18%;">Classificação</th>
                             </tr>
-                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até ao momento.</td></tr>'}
+                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até o momento.</td></tr>'}
                         </table>
                         <div class="footer">
                             <p style="margin: 0; font-weight: bold; color: #333;">NeuroPreditor Harvey • HUGV - UFAM</p>
@@ -755,19 +820,19 @@ if nav == "🏠 Área de Trabalho":
 # HISTÓRICO GERAL
 # ==========================================
 elif nav == "⚙️ Histórico Geral":
-    st.title("⚙️ Gestão de Dados Clínicos")
+    st.title("⚙️ Gerenciamento de Dados Clínicos")
     if os.path.exists(ARQUIVO_CSV):
         df_g = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("📥 Exportar Ficheiro Completo (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
+        st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Eliminar Registo do Sistema")
+        st.subheader("🗑️ Excluir Registro do Sistema")
         lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
-        del_sel = st.selectbox("Selecione o doente para apagar permanentemente:", lista_d)
-        if st.button("🚨 CONFIRMAR ELIMINAÇÃO") and del_sel:
+        del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
+        if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
             id_d = del_sel.split(" - ")[0]
             df_g[df_g['Prontuário'] != id_d].to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
-            st.success("Registo removido com sucesso."); st.rerun()
-    else: st.info("Nenhum dado registado.")
+            st.success("Registro removido com sucesso."); st.rerun()
+    else: st.info("Nenhum dado registrado.")
 
 st.markdown("<div class='watermark'>Made By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
