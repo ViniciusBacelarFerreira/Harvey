@@ -16,7 +16,7 @@ if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
 # Variáveis para armazenar o resultado atual na tela sem recarregar a página
-for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res']:
+for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res']:
     if mod not in st.session_state:
         st.session_state[mod] = None
 
@@ -26,6 +26,22 @@ SENHA_CORRETA = "hugv1869"
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
+def risco_progressao_chen_2021(resection, knosp, ki67, bmi, tabagismo):
+    pontos = 0
+    if resection == "Ressecção Parcial (PR < 70%)": pontos += 10.0
+    elif resection == "Ressecção Subtotal (STR 70-90%)": pontos += 5.5
+    elif resection == "Ressecção Quase Total (NTR 90-95%)": pontos += 3.5
+    
+    if knosp == "Grau 4": pontos += 7.5
+    elif knosp == "Graus 2 - 3": pontos += 3.8
+    
+    if ki67: pontos += 8.0
+    if bmi: pontos += 4.0
+    if tabagismo: pontos += 6.2
+    
+    logit = -4.0 + (0.2 * pontos)
+    return (1 / (1 + math.exp(-logit))) * 100
+
 def risco_meningite_zhou_2025(duracao_h, diametro_cm, fistula_intra):
     beta_duracao, beta_diametro, beta_fistula = 0.98, 0.99, 2.22
     beta_0 = -7.50 
@@ -62,7 +78,7 @@ def risco_recorrencia_cushing_cuper_2025(meses, hardy, local, previa):
 def obter_classificacao(prob, tipo):
     if tipo == "melhora":
         return ("Alta Chance", "green") if prob >= 60 else ("Chance Moderada", "orange") if prob >= 30 else ("Baixa Chance", "red")
-    return ("Baixo Risco", "green") if prob < 10 else ("Risco Moderado", "orange") if prob < 25 else ("Alto Risco", "red")
+    return ("Baixo Risco", "green") if prob < 15 else ("Risco Moderado", "orange") if prob < 30 else ("Alto Risco", "red")
 
 def salvar_registro(mod, prob, tipo, parametros=""):
     pac, mae, pront = st.session_state.paciente_ativo['nome'], st.session_state.paciente_ativo['mae'], str(st.session_state.paciente_ativo['prontuario'])
@@ -145,7 +161,7 @@ with st.sidebar:
         st.markdown("---")
         if st.button("❌ Fechar Prontuário Atual", type="primary", use_container_width=True):
             st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
-            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res']:
+            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res']:
                 st.session_state[mod] = None
             st.rerun()
 
@@ -166,7 +182,7 @@ with st.sidebar:
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
         st.markdown("<h1 class='main-title'>NeuroPreditor Transesfenoidal <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias (fístulas, diabetes insipidus, hiponatremia e meningite) em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
         
         st.markdown("<div class='input-card' style='text-align: center; padding: 25px;'><p style='font-size:1.15rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -193,7 +209,7 @@ if nav == "🏠 Área de Trabalho":
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
+            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -207,15 +223,15 @@ if nav == "🏠 Área de Trabalho":
             </div>
             <div style="text-align: right;">
                 <p style="margin-bottom:10px; font-size: 1.1rem;">Prontuário: <b>{st.session_state.paciente_ativo["prontuario"]}</b></p>
-                <button style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; border-radius: 8px; padding: 6px 15px; cursor: pointer; transition: 0.3s;" onclick="window.location.reload();" onmouseover="this.style.background='rgba(255,255,255,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">Trocar Paciente</button>
+                <button style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; border-radius: 8px; padding: 6px 15px; cursor: pointer; transition: 0.3s;" onclick="window.location.reload();" onmouseover="this.style.background='rgba(255,255,255,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">Atualizar Ficha</button>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📄 Relatório A4"])
+        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📈 Recidiva (Gigantes)", "📄 Relatório A4"])
 
         painel_placeholder = tabs[0].empty()
-        relatorio_placeholder = tabs[7].empty()
+        relatorio_placeholder = tabs[8].empty()
 
         with tabs[1]: 
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima a probabilidade de melhora visual ou recuperação do campo visual do paciente após a descompressão cirúrgica.</div>", unsafe_allow_html=True)
@@ -249,14 +265,13 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Utiliza o Modelo CuPeR para prever o risco de persistência ou recorrência da Doença de Cushing a longo prazo.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🔄 Doença de Cushing</h4>", unsafe_allow_html=True)
             
-            # Texto em Markdown formatado para o popup de ajuda
             help_hardy = """
             **Classificação Radiológica de Hardy (Grau de Invasão):**
-            * **Grau 0:** Sela túrcica intacta e de aspecto normal.
-            * **Grau 1:** Microadenoma (<10 mm); sela intacta, podendo ter assimetria ou abaulamento focal no assoalho.
-            * **Grau 2:** Macroadenoma (≥10 mm); sela alargada globalmente, mas com o assoalho ósseo ainda intacto.
-            * **Grau 3:** Tumor invasivo; erosão óssea localizada ou destruição parcial do assoalho selar.
-            * **Grau 4:** Destruição difusa e extensa do assoalho da sela túrcica ou invasão da base do crânio (Phantom Sella).
+            * **Grau 0:** Sela túrcica intacta e de aspeto normal.
+            * **Grau 1:** Microadenoma (<10 mm); sela intacta, podendo ter assimetria óssea focal.
+            * **Grau 2:** Macroadenoma (≥10 mm); sela alargada globalmente, mas com o assoalho intacto.
+            * **Grau 3:** Tumor invasivo; erosão óssea localizada ou destruição parcial.
+            * **Grau 4:** Destruição difusa e extensa da base do crânio.
             """
             
             c1, c2 = st.columns(2)
@@ -288,22 +303,21 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) durante o período pós-operatório imediato e mediato.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>💧 Fístula de Líquor</h4>", unsafe_allow_html=True)
             
-            # Texto em Markdown formatado para o popup de ajuda
             help_kelly = """
             **Grau de Kelly (Vazamento Intraoperatório de LCR):**
             * **Grau 0:** Nenhuma fístula liquórica observada.
-            * **Grau 1:** Fístula pequena (apenas 'gotejamento', umidade ou transudação) sem um defeito dural claro ou óbvio.
-            * **Grau 2:** Fístula moderada com fluxo claro e ativo de líquor através de um defeito definitivo e óbvio no diafragma selar/dura-máter.
-            * **Grau 3:** Fístula de alto fluxo (grande defeito dural, exposição ampla de cisternas basais ou abertura do 3º ventrículo).
+            * **Grau 1:** Fístula pequena (gotejamento/transudação) sem um defeito dural óbvio.
+            * **Grau 2:** Fístula moderada com fluxo claro através de um defeito definitivo.
+            * **Grau 3:** Fístula de alto fluxo (grande defeito dural, exposição do 3º ventrículo).
             """
             
             f1, f2 = st.columns(2)
             with f1: 
                 f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help=help_kelly)
-                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
+                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares.")
             with f2: 
-                f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Grau 3 significa volume de ar intracraniano considerável indicando comunicação ampla do espaço subaracnoideo.")
-                f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia/abertura do assoalho selar (osso esfenoidal) realizada pelo cirurgião.")
+                f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Volume de ar intracraniano considerável na imagem de controlo.")
+                f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia do assoalho selar.")
             
             if st.button("Calcular e Salvar Risco de Fístula", key="btn_fistula"):
                 res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
@@ -323,17 +337,17 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[4]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Prediz a chance do paciente desenvolver Diabetes Insipidus central no pós-operatório devido à manipulação da neuro-hipófise ou haste.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Prediz a chance do doente desenvolver Diabetes Insipidus central no pós-operatório devido à manipulação da neuro-hipófise.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
             d1, d2 = st.columns(2)
             with d1: 
-                di_d = st.checkbox("Paciente possui Diabetes Mellitus prévio?")
-                di_h = st.checkbox("Paciente possui Hipertensão Arterial Sistêmica?")
-                di_ca = st.checkbox("Paciente possui Cardiopatia prévia?")
+                di_d = st.checkbox("O paciente possui Diabetes Mellitus prévio?")
+                di_h = st.checkbox("O paciente possui Hipertensão Arterial Sistêmica?")
+                di_ca = st.checkbox("O paciente possui Cardiopatia prévia?")
             with d2: 
                 di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0, help="Nível de cortisol sérico obtido preferencialmente às 8h da manhã.")
                 di_f = st.toggle("Apresentou fístula liquórica documentada no pós-operatório?")
-                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?", help="Tumores duros exigem maior tração e curetagem, aumentando o risco mecânico e a manipulação adjacente à haste hipofisária.")
+                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?", help="Tumores duros exigem maior tração e curetagem.")
             
             if st.button("Calcular e Salvar Risco de D.I.", key="btn_di"):
                 res = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
@@ -353,22 +367,22 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (Delayed Postoperative Hyponatremia - DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório (fase secundária de SIADH).</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório (fase secundária de SIADH).</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🧂 Hiponatremia Tardia (DPH)</h4>", unsafe_allow_html=True)
             mod_h = st.radio("Selecione a base do modelo preditivo:", ["Modelo de Sangue (Cai et al.)", "Modelo de Imagem/Hormonal (Tan et al.)"])
-            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?", help="Sódio em declínio na fase aguda é um preditor clínico muito forte do desenvolvimento de SIADH tardia.")
+            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?", help="Sódio em declínio na fase aguda é um preditor clínico muito forte de SIADH tardia.")
             
             if mod_h == "Modelo de Sangue (Cai et al.)":
-                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0, help="O valor de monócitos relativos obtidos no hemograma de rotina no pós-operatório.")
-                pt = st.number_input("Tempo de Protrombina (segundos):", 0.0, help="Tempo de coagulação em segundos (PT/TAP).")
+                mo = st.number_input("Percentagem de Monócitos no hemograma (%):", 0.0)
+                pt = st.number_input("Tempo de Protrombina (segundos):", 0.0)
                 if st.button("Calcular e Salvar Risco (Modelo Cai)", key="btn_hipo_cai"):
                     res = risco_pdh_cai_2023(hp12, mo, pt)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Monócitos: {mo}% | Tempo de Protrombina: {pt} seg"
                     st.session_state.hipo_res = res
                     salvar_registro("DPH (Modelo Cai)", res, "risco", params)
             else:
-                pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0, help="Nível sérico medido no sangue antes da cirurgia.")
-                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0, help="Elevação do diafragma selar medido acima da linha basilar na RM sagital ou coronal.")
+                pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0)
+                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0)
                 if st.button("Calcular e Salvar Risco (Modelo Tan)", key="btn_hipo_tan"):
                     res = risco_pdh_tan_2025(pr, dia, hp12)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina pré-op: {pr} ng/mL | Elevação Diafragma: {dia} mm"
@@ -390,14 +404,14 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[6]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de meningite bacteriana pós-operatória baseado em dados anatômicos e variáveis cirúrgicas.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de meningite bacteriana pós-operatória baseado em dados anatómicos e variáveis cirúrgicas.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🦠 Meningite Pós-operatória</h4>", unsafe_allow_html=True)
             m1, m2 = st.columns(2)
             with m1: 
-                md = st.number_input("Duração total da Cirurgia (horas):", 0.0, help="Tempo cirúrgico prolongado aumenta exponencialmente o risco de contaminação cruzada e meningite (OR 2.68).")
-                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?", help="Vazamento de líquor durante a cirurgia é o principal preditor independente (aumenta o risco em ~9 vezes, OR 9.19).")
+                md = st.number_input("Duração total da Cirurgia (horas):", 0.0, help="Tempo cirúrgico prolongado aumenta o risco de contaminação cruzada e meningite.")
+                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?")
             with m2: 
-                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0, help="A cada 1 cm adicional no tamanho do tumor o risco de infecção aumenta em 2.7x, devido à maior complexidade da ressecção e maior área de exposição dural.")
+                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0)
             
             if st.button("Calcular e Salvar Risco de Meningite", key="btn_meningite"):
                 res = risco_meningite_zhou_2025(md, mt, mf)
@@ -416,10 +430,54 @@ if nav == "🏠 Área de Trabalho":
                 """)
             st.markdown("</div>", unsafe_allow_html=True)
             
+        with tabs[7]: 
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de <b>recorrência ou progressão num horizonte de 5 anos</b> especificamente para macroadenomas e adenomas gigantes (diâmetros superiores a 3-4 cm).</div>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h4>📈 Recidiva (Gigantes)</h4>", unsafe_allow_html=True)
+            
+            help_knosp = """
+            **Classificação de Knosp (Invasão do Seio Cavernoso):**
+            * **Graus 0-1:** Tumor não ultrapassa o centro da artéria carótida interna.
+            * **Graus 2-3:** Tumor ultrapassa o centro da artéria ou invade a parede lateral do seio cavernoso.
+            * **Grau 4:** Envolvimento completo (encasement) da artéria carótida interna intracavernosa.
+            """
+            
+            help_res = """
+            **Grau de Ressecção Cirúrgica Final:**
+            * **GTR:** Ressecção Total (>95%)
+            * **NTR:** Ressecção Quase Total (90-95%)
+            * **STR:** Ressecção Subtotal (70-90%)
+            * **PR:** Ressecção Parcial (<70%)
+            """
+            
+            ch1, ch2 = st.columns(2)
+            with ch1:
+                chen_res_op = st.selectbox("Extensão estimada da Ressecção Cirúrgica:", ["Ressecção Total (GTR > 95%)", "Ressecção Quase Total (NTR 90-95%)", "Ressecção Subtotal (STR 70-90%)", "Ressecção Parcial (PR < 70%)"], help=help_res)
+                chen_knosp = st.selectbox("Classificação de Knosp (RM Pré-op):", ["Graus 0 - 1", "Graus 2 - 3", "Grau 4"], help=help_knosp)
+                chen_tabagismo = st.toggle("O paciente possui histórico de tabagismo?")
+            with ch2:
+                chen_ki67 = st.toggle("Índice de proliferação tumoral Ki-67 ≥ 3%?", help="Marcador imuno-histoquímico de proliferação celular (geralmente avaliado após a biópsia/cirurgia).")
+                chen_bmi = st.toggle("Índice de Massa Corporal (IMC) ≥ 25 kg/m²?", help="Identifica doentes com sobrepeso ou obesidade, o que se demonstrou ser um fator de risco associado.")
+                
+            if st.button("Calcular e Salvar Risco de Recidiva (5 Anos)", key="btn_chen"):
+                res = risco_progressao_chen_2021(chen_res_op, chen_knosp, chen_ki67, chen_bmi, chen_tabagismo)
+                params = f"Ressecção: {chen_res_op} | Knosp: {chen_knosp} | Ki-67 ≥3%: {'Sim' if chen_ki67 else 'Não'} | IMC ≥25: {'Sim' if chen_bmi else 'Não'} | Tabagismo: {'Sim' if chen_tabagismo else 'Não'}"
+                st.session_state.chen_res = res
+                salvar_registro("Risco de Recidiva 5 Anos", res, "risco", params)
+                
+            if st.session_state.chen_res is not None:
+                st.success("Cálculo realizado e salvo com sucesso!")
+                st.metric("Risco Calculado de Progressão (5 Anos)", f"{st.session_state.chen_res:.1f}%")
+                
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Chen Y, Cai F, Cao J, et al.** Analysis of Related Factors of Tumor Recurrence or Progression After Transnasal Sphenoidal Surgical Treatment of Large and Giant Pituitary Adenomas and Establish a Nomogram to Predict Tumor Prognosis. *Front Endocrinol*. 2021;12:793337.  
+                **DOI:** [10.3389/fendo.2021.793337](https://doi.org/10.3389/fendo.2021.793337)
+                """)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
         # =======================================================
         # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA)
         # =======================================================
-        
         with painel_placeholder.container():
             st.subheader("📊 Resultados Consolidados e Arquivados")
             if os.path.exists(ARQUIVO_CSV):
@@ -445,11 +503,11 @@ if nav == "🏠 Área de Trabalho":
                             </div><br>
                             """, unsafe_allow_html=True)
                 else: 
-                    st.info("Nenhum cálculo salvo ainda. Realize as avaliações nas abas acima.")
+                    st.info("Nenhum cálculo salvo ainda. Realize as avaliações nos separadores acima.")
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
-            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações da impressora do seu navegador, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores institucionais do cabeçalho.")
+            st.info("Clique no botão abaixo para imprimir ou guardar como PDF nativo do sistema. Nas definições de impressão, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores do cabeçalho.")
             
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
@@ -499,7 +557,7 @@ if nav == "🏠 Área de Trabalho":
             <body>
                 <div style="width: 210mm; max-width: 100%;">
                     <div class="no-print">
-                        <button class="print-button" onclick="window.print()">🖨️ CLIQUE AQUI PARA IMPRIMIR OU SALVAR EM PDF</button>
+                        <button class="print-button" onclick="window.print()">🖨️ CLIQUE AQUI PARA IMPRIMIR OU GUARDAR EM PDF</button>
                     </div>
                     <div class="a4-page">
                         <div class="header">
@@ -508,10 +566,10 @@ if nav == "🏠 Área de Trabalho":
                         </div>
                         
                         <div class="patient-box">
-                            <p><b>Paciente:</b> {st.session_state.paciente_ativo['nome']}</p>
-                            <p><b>Registro / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
+                            <p><b>Doente:</b> {st.session_state.paciente_ativo['nome']}</p>
+                            <p><b>Registo / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
                             <p><b>Nome da Mãe:</b> {st.session_state.paciente_ativo['mae']}</p>
-                            <p><b>Data da Emissão:</b> {datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")}</p>
+                            <p><b>Data de Emissão:</b> {datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")}</p>
                         </div>
                         
                         <div class="section-title">Sumário de Risco e Parâmetros Analisados</div>
@@ -522,7 +580,7 @@ if nav == "🏠 Área de Trabalho":
                                 <th style="width: 12%;">Resultado</th>
                                 <th style="width: 18%;">Classificação</th>
                             </tr>
-                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até o momento.</td></tr>'}
+                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até ao momento.</td></tr>'}
                         </table>
                         
                         <div style="font-size: 11px; color: #666; text-align: justify; background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 3px solid #ffc107;">
@@ -544,20 +602,19 @@ if nav == "🏠 Área de Trabalho":
 # HISTÓRICO GERAL
 # ==========================================
 elif nav == "⚙️ Histórico Geral":
-    st.title("⚙️ Gerenciamento de Dados Clínicos")
+    st.title("⚙️ Gestão de Dados Clínicos")
     if os.path.exists(ARQUIVO_CSV):
         df_g = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
+        st.download_button("📥 Exportar Ficheiro Completo (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Excluir Paciente do Sistema")
+        st.subheader("🗑️ Eliminar Registo do Sistema")
         lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
-        del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
-        if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
+        del_sel = st.selectbox("Selecione o doente para apagar permanentemente:", lista_d)
+        if st.button("🚨 CONFIRMAR ELIMINAÇÃO") and del_sel:
             id_d = del_sel.split(" - ")[0]
             df_g[df_g['Prontuário'] != id_d].to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
-            st.success("Registro removido com sucesso."); st.rerun()
-    else: st.info("Nenhum dado registrado.")
+            st.success("Registo removido com sucesso."); st.rerun()
+    else: st.info("Nenhum dado registado.")
 
-# Marca d'água invisível que não quebra o layout
 st.markdown("<div class='watermark'>Made By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
