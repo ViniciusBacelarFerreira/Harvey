@@ -18,7 +18,7 @@ if 'autenticado' not in st.session_state:
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
-# Variáveis para armazenar o resultado (Probabilidade, Contribuições) na tela sem recarregar
+# Variáveis para armazenar o resultado atual na tela sem recarregar a página
 lista_modulos = ['visao_res', 'cushing_res', 'fistula_intra_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res', 'nfpa_res']
 for mod in lista_modulos:
     if mod not in st.session_state:
@@ -73,7 +73,7 @@ def init_db():
 init_db()
 
 # ==========================================
-# FUNÇÕES DE XAI E GRÁFICOS
+# FUNÇÕES DE XAI, GRÁFICOS E MÉTRICAS
 # ==========================================
 def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Modelo Matemático)"):
     labels = list(contribuicoes.keys())
@@ -343,7 +343,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     st.markdown("<div class='sidebar-section-title'>Navegação Principal</div>", unsafe_allow_html=True)
-    nav = st.radio("Módulos:", ["🏠 Área de Trabalho", "📊 Gestão & Análise"], label_visibility="collapsed")
+    nav = st.radio("Módulos:", ["🏠 Área de Trabalho", "📊 Gestão & Analytics"], label_visibility="collapsed")
     st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     if st.session_state.paciente_ativo['prontuario']:
@@ -745,7 +745,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         # =======================================================
-        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA DA BASE DE DADOS)
+        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA)
         # =======================================================
         with painel_placeholder.container():
             st.subheader("📊 Resultados Consolidados e Arquivados")
@@ -774,6 +774,8 @@ if nav == "🏠 Área de Trabalho":
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
+            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações de impressão, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores institucionais do cabeçalho.")
+            
             linhas_html = ""
             df_rel_pac = obter_df_paciente(st.session_state.paciente_ativo['prontuario'])
             
@@ -859,7 +861,6 @@ elif nav == "📊 Gestão & Analytics":
         med_idade, med_diam = extrair_metricas_parametros(df_g)
         total_pacientes = df_g['Prontuário'].nunique()
         total_avaliacoes = len(df_g)
-        perc_alto_risco = (len(df_g[df_g['Classificação'] == 'Alto Risco']) / total_avaliacoes) * 100 if total_avaliacoes > 0 else 0
         
         # Exibição de Métricas (KPIs)
         col1, col2, col3, col4 = st.columns(4)
@@ -891,7 +892,7 @@ elif nav == "📊 Gestão & Analytics":
 
         st.markdown("---")
         st.subheader("🗃️ Base de Dados Completa")
-        st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False).drop(columns=['Mês']), use_container_width=True, hide_index=True)
+        st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False).drop(columns=['Mês'], errors='ignore'), use_container_width=True, hide_index=True)
         st.download_button("📥 Exportar Base de Dados (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_harvey_db.csv", "text/csv")
         
         st.markdown("---")
