@@ -4,6 +4,7 @@ import math
 import pandas as pd
 import datetime
 import os
+import sqlite3
 import plotly.graph_objects as go
 
 # ==========================================
@@ -16,17 +17,63 @@ if 'autenticado' not in st.session_state:
 if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
-# Variáveis para armazenar o resultado (Probabilidade, Contribuições) na janela sem recarregar a página
+# Variáveis para armazenar o resultado (Probabilidade, Contribuições) no ecrã sem recarregar
 lista_modulos = ['visao_res', 'cushing_res', 'fistula_intra_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res', 'nfpa_res']
 for mod in lista_modulos:
     if mod not in st.session_state:
         st.session_state[mod] = None
 
-ARQUIVO_CSV = "registro_pacientes.csv"
+DB_NAME = "harvey_database.db"
 SENHA_CORRETA = "hugv1869"
 
 # ==========================================
-# FUNÇÕES DE XAI (EXPLICABILIDADE E GRÁFICOS)
+# INICIALIZAÇÃO DA BASE DE DADOS (SQLITE)
+# ==========================================
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS avaliacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_hora TEXT,
+            prontuario TEXT,
+            paciente TEXT,
+            mae TEXT,
+            avaliacao_clinica TEXT,
+            parametros TEXT,
+            resultado REAL,
+            classificacao TEXT,
+            tipo TEXT
+        )
+    ''')
+    
+    # Migração automática do ficheiro CSV antigo para SQLite (se existir)
+    c.execute("SELECT COUNT(*) FROM avaliacoes")
+    if c.fetchone()[0] == 0 and os.path.exists("registro_pacientes.csv"):
+        try:
+            df_migracao = pd.read_csv("registro_pacientes.csv", dtype={'Prontuário': str})
+            for _, row in df_migracao.iterrows():
+                param_inseridos = row.get('Parâmetros Inseridos', 'Dados antigos não registados')
+                if pd.isna(param_inseridos): param_inseridos = 'Dados antigos não registados'
+                
+                c.execute('''
+                    INSERT INTO avaliacoes (data_hora, prontuario, paciente, mae, avaliacao_clinica, parametros, resultado, classificacao, tipo)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (str(row['Data/Hora']), str(row['Prontuário']), str(row['Paciente']), str(row['Mãe']), 
+                      str(row['Avaliação Clínica']), str(param_inseridos), float(row['Resultado (%)']), 
+                      str(row['Classificação']), str(row['Tipo'])))
+            print("Migração do CSV para SQLite concluída com sucesso.")
+        except Exception as e:
+            print(f"Erro na migração do CSV: {e}")
+            
+    conn.commit()
+    conn.close()
+
+# Iniciar a base de dados
+init_db()
+
+# ==========================================
+# FUNÇÕES DE XAI E GRÁFICOS
 # ==========================================
 def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Modelo Matemático)"):
     labels = list(contribuicoes.keys())
@@ -38,59 +85,26 @@ def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Model
     measures.append("total")
     
     fig = go.Figure(go.Waterfall(
-        orientation="v",
-        measure=measures,
-        x=labels,
-        textposition="outside",
+        orientation="v", measure=measures, x=labels, textposition="outside",
         text=[f"{v:+.2f}" if m == "relative" else f"{v:.2f}" for m, v in zip(measures, values)],
-        y=values,
-        connector={"line":{"color":"rgba(128,128,128,0.5)"}},
-        decreasing={"marker":{"color":"#1565c0"}}, 
-        increasing={"marker":{"color":"#ef6c00"}}, 
-        totals={"marker":{"color":"#333333"}}      
+        y=values, connector={"line":{"color":"rgba(128,128,128,0.5)"}},
+        decreasing={"marker":{"color":"#1565c0"}}, increasing={"marker":{"color":"#ef6c00"}}, totals={"marker":{"color":"#333333"}}      
     ))
-    
-    fig.update_layout(
-        title={"text": titulo, "font": {"size": 14}},
-        showlegend=False,
-        height=320,
-        margin=dict(l=20, r=20, t=40, b=20),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.1)')
-    )
+    fig.update_layout(title={"text": titulo, "font": {"size": 14}}, showlegend=False, height=320, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     return fig
 
 def gerar_grafico_velocimetro(prob, tipo="risco"):
     if tipo == "melhora":
-        steps = [
-            {'range': [0, 30], 'color': "rgba(198, 40, 40, 0.8)"},   # Vermelho
-            {'range': [30, 60], 'color': "rgba(239, 108, 0, 0.8)"},  # Laranja
-            {'range': [60, 100], 'color': "rgba(46, 125, 50, 0.8)"}  # Verde
-        ]
+        steps = [{'range': [0, 30], 'color': "rgba(198, 40, 40, 0.8)"}, {'range': [30, 60], 'color': "rgba(239, 108, 0, 0.8)"}, {'range': [60, 100], 'color': "rgba(46, 125, 50, 0.8)"}]
         title = "Probabilidade"
     else:
-        steps = [
-            {'range': [0, 15], 'color': "rgba(46, 125, 50, 0.8)"},   # Verde
-            {'range': [15, 30], 'color': "rgba(239, 108, 0, 0.8)"},  # Laranja
-            {'range': [30, 100], 'color': "rgba(198, 40, 40, 0.8)"}  # Vermelho
-        ]
+        steps = [{'range': [0, 15], 'color': "rgba(46, 125, 50, 0.8)"}, {'range': [15, 30], 'color': "rgba(239, 108, 0, 0.8)"}, {'range': [30, 100], 'color': "rgba(198, 40, 40, 0.8)"}]
         title = "Nível de Risco"
 
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=prob,
-        number={'suffix': "%", 'font': {'size': 40, 'color': '#333'}},
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': title, 'font': {'size': 18, 'color': '#555'}},
-        gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "rgba(0, 0, 0, 0.8)", 'thickness': 0.15},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': steps,
-        }
+        mode="gauge+number", value=prob, number={'suffix': "%", 'font': {'size': 40, 'color': '#333'}},
+        domain={'x': [0, 1], 'y': [0, 1]}, title={'text': title, 'font': {'size': 18, 'color': '#555'}},
+        gauge={'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"}, 'bar': {'color': "rgba(0, 0, 0, 0.8)", 'thickness': 0.15}, 'bgcolor': "white", 'borderwidth': 2, 'bordercolor': "gray", 'steps': steps}
     ))
     fig.update_layout(height=320, margin=dict(l=20, r=20, t=50, b=20), paper_bgcolor='rgba(0,0,0,0)')
     return fig
@@ -100,9 +114,9 @@ def obter_texto_explicativo(contribuicoes):
     if not contribs_clinicas: return ""
     max_var = max(contribs_clinicas, key=lambda k: abs(contribs_clinicas[k]))
     max_val = contribs_clinicas[max_var]
-    if max_val == 0: return "Nenhum fator de risco adicional pontuou neste paciente."
+    if max_val == 0: return "Nenhum fator de risco adicional pontuou neste doente."
     acao = "aumentou" if max_val > 0 else "reduziu"
-    return f"A variável clínica que mais **{acao}** a probabilidade neste paciente foi: **{max_var}** (Impacto no Logit: {max_val:+.2f})."
+    return f"A variável clínica que mais **{acao}** a probabilidade neste doente foi: **{max_var}** (Impacto no Logit: {max_val:+.2f})."
 
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END COM XAI)
@@ -114,8 +128,7 @@ def risco_progressao_nfpa_zhong_2024(ki67_high, knosp_high, resseccao_subtotal):
     c_res = 1.771 * (1 if resseccao_subtotal else 0)
     logit = beta_0 + c_ki67 + c_knosp + c_res
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": beta_0, "Ki-67 ≥3%": c_ki67, "Knosp 3B-4": c_knosp, "Ressecção Incompleta": c_res}
-    return prob, contribs
+    return prob, {"Risco Base": beta_0, "Ki-67 ≥3%": c_ki67, "Knosp 3B-4": c_knosp, "Ressecção Incompleta": c_res}
 
 def risco_fistula_intraop_cai_2021(altura_tumor_mm, albumina_gl):
     beta_0 = 3.10
@@ -123,8 +136,7 @@ def risco_fistula_intraop_cai_2021(altura_tumor_mm, albumina_gl):
     c_albumina = -0.1395 * albumina_gl
     logit = beta_0 + c_altura + c_albumina
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": beta_0, "Altura Tumor": c_altura, "Albumina Sérica": c_albumina}
-    return prob, contribs
+    return prob, {"Risco Base": beta_0, "Altura Tumor": c_altura, "Albumina Sérica": c_albumina}
 
 def remissao_acromegalia_cohen_2024(idade, diametro, knosp, igf1, gh):
     c_idade = 1 if idade <= 50 else 0
@@ -133,10 +145,8 @@ def remissao_acromegalia_cohen_2024(idade, diametro, knosp, igf1, gh):
     c_igf1 = 2 if igf1 >= 3.0 else 0
     c_gh = 1 if gh >= 8.0 else 0
     pontos = c_idade + c_diam + c_knosp + c_igf1 + c_gh
-    mapa_remissao = {0: 100.0, 1: 90.0, 2: 65.0, 3: 35.0, 4: 15.0, 5: 15.0}
-    prob = mapa_remissao.get(pontos, 0.0)
-    contribs = {"Base (0 Pontos)": 0, "Idade ≤50": c_idade, "Diâmetro ≥1.5": c_diam, "Knosp ≥3A": c_knosp, "IGF-1 ≥3.0": c_igf1, "GH ≥8.0": c_gh}
-    return prob, contribs
+    prob = {0: 100.0, 1: 90.0, 2: 65.0, 3: 35.0, 4: 15.0, 5: 15.0}.get(pontos, 0.0)
+    return prob, {"Base (0 Pontos)": 0, "Idade ≤50": c_idade, "Diâmetro ≥1.5": c_diam, "Knosp ≥3A": c_knosp, "IGF-1 ≥3.0": c_igf1, "GH ≥8.0": c_gh}
 
 def risco_progressao_chen_2021(resection, knosp, ki67, bmi, tabagismo):
     c_res = 10.0 if resection == "Ressecção Parcial (PR < 70%)" else (5.5 if resection == "Ressecção Subtotal (STR 70-90%)" else (3.5 if resection == "Ressecção Quase Total (NTR 90-95%)" else 0))
@@ -144,11 +154,9 @@ def risco_progressao_chen_2021(resection, knosp, ki67, bmi, tabagismo):
     c_ki67 = 8.0 if ki67 else 0
     c_bmi = 4.0 if bmi else 0
     c_tab = 6.2 if tabagismo else 0
-    pontos = c_res + c_knosp + c_ki67 + c_bmi + c_tab
-    logit = -4.0 + (0.2 * pontos)
+    logit = -4.0 + (0.2 * (c_res + c_knosp + c_ki67 + c_bmi + c_tab))
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": -4.0, "Ressecção": c_res*0.2, "Knosp": c_knosp*0.2, "Ki-67": c_ki67*0.2, "IMC": c_bmi*0.2, "Tabagismo": c_tab*0.2}
-    return prob, contribs
+    return prob, {"Risco Base": -4.0, "Ressecção": c_res*0.2, "Knosp": c_knosp*0.2, "Ki-67": c_ki67*0.2, "IMC": c_bmi*0.2, "Tabagismo": c_tab*0.2}
 
 def risco_meningite_zhou_2025(duracao_h, diametro_cm, fistula_intra):
     c_dur = 0.98 * duracao_h
@@ -156,8 +164,7 @@ def risco_meningite_zhou_2025(duracao_h, diametro_cm, fistula_intra):
     c_fist = 2.22 * (1 if fistula_intra else 0)
     logit = -7.50 + c_dur + c_diam + c_fist
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": -7.50, "Duração Cirurgia": c_dur, "Diâmetro Tumor": c_diam, "Fístula LCR": c_fist}
-    return prob, contribs
+    return prob, {"Risco Base": -7.50, "Duração Cirurgia": c_dur, "Diâmetro Tumor": c_diam, "Fístula LCR": c_fist}
 
 def risco_pdh_cai_2023(hipo_precoce, monocitos, pt):
     c_hipo = 0.97 * (1 if hipo_precoce else 0)
@@ -165,8 +172,7 @@ def risco_pdh_cai_2023(hipo_precoce, monocitos, pt):
     c_pt = 0.58 * pt
     logit = -12.50 + c_hipo + c_mon + c_pt
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": -12.50, "Hipo Precoce": c_hipo, "Monócitos": c_mon, "Protrombina": c_pt}
-    return prob, contribs
+    return prob, {"Risco Base": -12.50, "Hipo Precoce": c_hipo, "Monócitos": c_mon, "Protrombina": c_pt}
 
 def risco_pdh_tan_2025(pr, dia, hp12):
     beta_0 = -7.50
@@ -175,8 +181,7 @@ def risco_pdh_tan_2025(pr, dia, hp12):
     c_hp = 3.486 * (1 if hp12 else 0)
     logit = beta_0 + c_pr + c_dia + c_hp
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": beta_0, "Prolactina": c_pr, "Diafragma": c_dia, "Hipo Precoce": c_hp}
-    return prob, contribs
+    return prob, {"Risco Base": beta_0, "Prolactina": c_pr, "Diafragma": c_dia, "Hipo Precoce": c_hp}
 
 def risco_fistula_lcr_zhang_2025(kelly, supra, pneumo, janela):
     c_k = 1.55 * (1 if kelly else 0)
@@ -185,8 +190,7 @@ def risco_fistula_lcr_zhang_2025(kelly, supra, pneumo, janela):
     c_j = 0.18 * janela
     logit = -10.00 + c_k + c_s + c_p + c_j
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": -10.00, "Kelly": c_k, "Suprasselar": c_s, "Pneumoencéfalo": c_p, "Janela óssea": c_j}
-    return prob, contribs
+    return prob, {"Risco Base": -10.00, "Kelly": c_k, "Suprasselar": c_s, "Pneumoencéfalo": c_p, "Janela óssea": c_j}
 
 def risco_diabetes_insipidus_li_2024(dm, has, cardio, cortisol, fistula, rigido):
     c_dm = 0.845 * (1 if dm else 0)
@@ -197,8 +201,7 @@ def risco_diabetes_insipidus_li_2024(dm, has, cardio, cortisol, fistula, rigido)
     c_rig = 0.776 * (1 if rigido else 0)
     logit = -6.50 + c_dm + c_has + c_car + c_cor + c_fist + c_rig
     prob = (1 / (1 + math.exp(-logit))) * 100
-    contribs = {"Risco Base": -6.50, "DM": c_dm, "HAS": c_has, "Cardiopatia": c_car, "Cortisol": c_cor, "Fístula LCR": c_fist, "Tumor Rígido": c_rig}
-    return prob, contribs
+    return prob, {"Risco Base": -6.50, "DM": c_dm, "HAS": c_has, "Cardiopatia": c_car, "Cortisol": c_cor, "Fístula LCR": c_fist, "Tumor Rígido": c_rig}
 
 def risco_melhora_visual_ji_2023(comp, dif, meses, md):
     c_comp = 13 if comp else 0
@@ -207,23 +210,19 @@ def risco_melhora_visual_ji_2023(comp, dif, meses, md):
     c_md = max(0, (md - 2) * 1.42)
     pontos = c_comp + c_dif + c_mes + c_md
     prob = min(95.0, (pontos / 103.0) * 33.0)
-    contribs = {"Base": 0, "Compressão": c_comp, "Defeito Difuso": c_dif, "Sintomas (Meses)": c_mes, "Mean Defect": c_md}
-    return prob, contribs
+    return prob, {"Base": 0, "Compressão": c_comp, "Defeito Difuso": c_dif, "Sintomas (Meses)": c_mes, "Mean Defect": c_md}
 
 def risco_recorrencia_cushing_cuper_2025(meses, hardy, local, previa):
     c_mes = meses * 0.41
     c_har = hardy * 12.5
     c_prev = 28 if previa else 0
-    loc_map = {'direita': 14, 'central': 18, 'esquerda': 22, 'haste': 33}
-    c_loc = loc_map.get(local.lower(), 0)
+    c_loc = {'direita': 14, 'central': 18, 'esquerda': 22, 'haste': 33}.get(local.lower(), 0)
     pontos = c_mes + c_har + c_prev + c_loc
-    if pontos <= 60: prob = (pontos/60)*10
-    else: prob = min(95.0, 10 + (pontos-60)*0.75)
-    contribs = {"Base": 0, "Duração Sintomas": c_mes, "Grau Hardy": c_har, "Cirurgia Prévia": c_prev, "Localização": c_loc}
-    return prob, contribs
+    prob = (pontos/60)*10 if pontos <= 60 else min(95.0, 10 + (pontos-60)*0.75)
+    return prob, {"Base": 0, "Duração Sintomas": c_mes, "Grau Hardy": c_har, "Cirurgia Prévia": c_prev, "Localização": c_loc}
 
 # ==========================================
-# GESTÃO DE DADOS
+# GESTÃO DE DADOS (SQLITE)
 # ==========================================
 def obter_classificacao(prob, tipo):
     if tipo == "melhora":
@@ -231,24 +230,44 @@ def obter_classificacao(prob, tipo):
     return ("Baixo Risco", "green") if prob < 15 else ("Risco Moderado", "orange") if prob < 30 else ("Alto Risco", "red")
 
 def salvar_registro(mod, prob, tipo, parametros=""):
-    pac, mae, pront = st.session_state.paciente_ativo['nome'], st.session_state.paciente_ativo['mae'], str(st.session_state.paciente_ativo['prontuario'])
+    pac = st.session_state.paciente_ativo['nome']
+    mae = st.session_state.paciente_ativo['mae']
+    pront = str(st.session_state.paciente_ativo['prontuario'])
     classif, _ = obter_classificacao(prob, tipo)
     data = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
-    novo = pd.DataFrame([{
-        "Data/Hora": data, "Prontuário": pront, "Paciente": pac, "Mãe": mae, 
-        "Avaliação Clínica": mod, "Parâmetros Inseridos": parametros,
-        "Resultado (%)": round(prob, 1), "Classificação": classif, "Tipo": tipo
-    }])
-    
-    if os.path.exists(ARQUIVO_CSV):
-        df_e = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-        if 'Parâmetros Inseridos' not in df_e.columns:
-            df_e['Parâmetros Inseridos'] = "Dados antigos não registrados"
-        pd.concat([df_e, novo], ignore_index=True).to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
-    else: 
-        novo.to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO avaliacoes (data_hora, prontuario, paciente, mae, avaliacao_clinica, parametros, resultado, classificacao, tipo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (data, pront, pac, mae, mod, parametros, round(prob, 1), classif, tipo))
+    conn.commit()
+    conn.close()
     return True
+
+def obter_df_paciente(prontuario):
+    conn = sqlite3.connect(DB_NAME)
+    query = '''
+        SELECT data_hora as "Data/Hora", avaliacao_clinica as "Avaliação Clínica", parametros as "Parâmetros Inseridos", 
+               resultado as "Resultado (%)", classificacao as "Classificação", tipo as "Tipo"
+        FROM avaliacoes WHERE prontuario = ?
+    '''
+    df = pd.read_sql(query, conn, params=(str(prontuario),))
+    conn.close()
+    return df
+
+def obter_df_completo():
+    conn = sqlite3.connect(DB_NAME)
+    query = '''
+        SELECT data_hora as "Data/Hora", prontuario as "Prontuário", paciente as "Paciente", mae as "Mãe",
+               avaliacao_clinica as "Avaliação Clínica", parametros as "Parâmetros Inseridos", 
+               resultado as "Resultado (%)", classificacao as "Classificação", tipo as "Tipo"
+        FROM avaliacoes
+    '''
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
 
 # ==========================================
 # ESTILOS CSS INTELIGENTES (DARK/LIGHT MODE)
@@ -284,14 +303,14 @@ if not st.session_state.autenticado:
         st.markdown("<h1 class='main-title' style='font-size: 2.8rem;'>NeuroPreditor <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
         st.markdown("<p style='font-size: 1rem; opacity: 0.8; margin-bottom: 30px;'>Acesso Restrito - Hospital Universitário Getúlio Vargas</p>", unsafe_allow_html=True)
         
-        senha = st.text_input("Senha Institucional:", type="password", placeholder="Insira a senha...")
+        senha = st.text_input("Senha Institucional:", type="password", placeholder="Insira a palavra-passe...")
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("DESBLOQUEAR ACESSO", use_container_width=True):
             if senha == SENHA_CORRETA:
                 st.session_state.autenticado = True
                 st.rerun()
             else: 
-                st.error("Senha incorreta. Tente novamente.")
+                st.error("Palavra-passe incorreta. Tente novamente.")
         
         st.markdown("<hr style='opacity: 0.15; margin: 30px 0 20px 0;'>", unsafe_allow_html=True)
         st.markdown("<p style='font-size: 0.85rem; font-weight: 600; opacity: 0.7; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Made By Vinícius Bacelar Ferreira</p>", unsafe_allow_html=True)
@@ -305,7 +324,7 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 10px 0;'>
             <h4 style='color: var(--text-color); margin: 0; font-weight: 600; opacity: 0.8;'>HUGV - UFAM</h4>
-            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'></span></h2>
+            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'>AI</span></h2>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -315,7 +334,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     if st.session_state.paciente_ativo['prontuario']:
-        st.markdown("<div class='sidebar-section-title'>Paciente em Consulta</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-section-title'>Doente em Consulta</div>", unsafe_allow_html=True)
         st.markdown(f"""
         <div class="sidebar-patient-card">
             <div style="font-size: 0.8rem; color: var(--text-color); opacity: 0.7;">Prontuário: <b>{st.session_state.paciente_ativo['prontuario']}</b></div>
@@ -332,7 +351,7 @@ with st.sidebar:
 
     st.markdown("<div class='sidebar-section-title'>Sistema</div>", unsafe_allow_html=True)
     with st.expander("🌓 Tema (Claro/Escuro)"):
-        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito da tela > **Settings** > **Theme**.")
+        st.write("O sistema adapta-se automaticamente à preferência do seu dispositivo. Para alterar manualmente, clique no **Menu (⋮)** no canto superior direito do ecrã > **Settings** > **Theme**.")
     
     if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
@@ -354,27 +373,30 @@ if nav == "🏠 Área de Trabalho":
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("<div class='input-card'><h3>🔍 Acessar Prontuário Antigo</h3>", unsafe_allow_html=True)
-            if os.path.exists(ARQUIVO_CSV):
-                df_b = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-                lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.drop_duplicates(subset=['Prontuário']).iterrows()]
-                sel = st.selectbox("Selecione o paciente:", lista)
+            st.markdown("<div class='input-card'><h3>🔍 Aceder a Prontuário Antigo</h3>", unsafe_allow_html=True)
+            conn = sqlite3.connect(DB_NAME)
+            df_b = pd.read_sql("SELECT DISTINCT prontuario as 'Prontuário', paciente as 'Paciente', mae as 'Mãe' FROM avaliacoes", conn)
+            conn.close()
+            
+            if not df_b.empty:
+                lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.iterrows()]
+                sel = st.selectbox("Selecione o doente:", lista)
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("Abrir Prontuário Selecionado", use_container_width=True) and sel:
                     id_p = sel.split(" - ")[0]
                     dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
                     st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
                     st.rerun()
-            else: st.info("Sem registros no momento.")
+            else: st.info("Sem registos na base de dados no momento.")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with c2:
-            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Paciente</h3>", unsafe_allow_html=True)
-            nn = st.text_input("Nome Completo do Paciente:")
+            st.markdown("<div class='input-card'><h3>➕ Cadastrar Novo Doente</h3>", unsafe_allow_html=True)
+            nn = st.text_input("Nome Completo do Doente:")
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -383,7 +405,7 @@ if nav == "🏠 Área de Trabalho":
         st.markdown(f"""
         <div class="patient-header">
             <div>
-                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Eletrônico Ativo</p>
+                <p style="font-size:0.85rem; opacity:0.8; margin-bottom:5px; text-transform:uppercase; letter-spacing: 1px;">Prontuário Eletrónico Ativo</p>
                 <h2 style="margin-top:0; margin-bottom:0;">👤 {st.session_state.paciente_ativo["nome"]}</h2>
             </div>
             <div style="text-align: right;">
@@ -409,7 +431,7 @@ if nav == "🏠 Área de Trabalho":
                 v_m = st.number_input("Duração dos sintomas visuais (meses):", 0)
                 v_md = st.number_input("Mean Defect (MD) pré-operatório (dB):", 0.0)
             
-            if st.button("Calcular e Salvar Probabilidade Visual", key="btn_visao"):
+            if st.button("Calcular e Guardar Probabilidade Visual", key="btn_visao"):
                 res, contribs = risco_melhora_visual_ji_2023(v_q, v_d, v_m, v_md)
                 params = f"Compressão: {'Sim' if v_q else 'Não'} | Defeito: {'Sim' if v_d else 'Não'} | Sintomas: {v_m} meses | MD: {v_md} dB"
                 st.session_state.visao_res = (res, contribs)
@@ -417,7 +439,7 @@ if nav == "🏠 Área de Trabalho":
             
             if st.session_state.visao_res is not None:
                 res, contribs = st.session_state.visao_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso na base de dados!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -437,12 +459,12 @@ if nav == "🏠 Área de Trabalho":
             c1, c2 = st.columns(2)
             with c1: 
                 c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1")
-                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?")
+                c_cp = st.toggle("O doente possui cirurgia pituitária prévia?")
             with c2: 
                 c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2)
                 c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"])
             
-            if st.button("Calcular e Salvar Risco de Recorrência", key="btn_cushing"):
+            if st.button("Calcular e Guardar Risco de Recorrência", key="btn_cushing"):
                 res, contribs = risco_recorrencia_cushing_cuper_2025(c_dur, c_h, c_l, c_cp)
                 params = f"Sintomas: {c_dur} meses | Cirurgia Prévia: {'Sim' if c_cp else 'Não'} | Grau Hardy: {c_h} | Localização: {c_l}"
                 st.session_state.cushing_res = (res, contribs)
@@ -450,7 +472,7 @@ if nav == "🏠 Área de Trabalho":
             
             if st.session_state.cushing_res is not None:
                 res, contribs = st.session_state.cushing_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso na base de dados!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -482,7 +504,7 @@ if nav == "🏠 Área de Trabalho":
                     
                 if st.session_state.fistula_intra_res is not None:
                     res, contribs = st.session_state.fistula_intra_res
-                    st.success("Cálculo intraoperatório salvo com sucesso!")
+                    st.success("Cálculo intraoperatório guardado com sucesso!")
                     
                     col_g, col_x = st.columns([1, 1.5])
                     with col_g:
@@ -509,7 +531,7 @@ if nav == "🏠 Área de Trabalho":
 
                 if st.session_state.fistula_res is not None:
                     res, contribs = st.session_state.fistula_res
-                    st.success("Cálculo pós-operatório salvo com sucesso!")
+                    st.success("Cálculo pós-operatório guardado com sucesso!")
                     
                     col_g, col_x = st.columns([1, 1.5])
                     with col_g:
@@ -525,15 +547,15 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='input-card'><h4>🚰 Diabetes Insipidus</h4>", unsafe_allow_html=True)
             d1, d2 = st.columns(2)
             with d1: 
-                di_d = st.checkbox("O paciente possui Diabetes Mellitus prévio?")
-                di_h = st.checkbox("O paciente possui Hipertensão Arterial Sistêmica?")
-                di_ca = st.checkbox("O paciente possui Cardiopatia prévia?")
+                di_d = st.checkbox("O doente possui Diabetes Mellitus prévio?")
+                di_h = st.checkbox("O doente possui Hipertensão Arterial Sistémica?")
+                di_ca = st.checkbox("O doente possui Cardiopatia prévia?")
             with d2: 
                 di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0)
                 di_f = st.toggle("Apresentou fístula liquórica documentada no pós-operatório?")
                 di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?")
             
-            if st.button("Calcular e Salvar Risco de D.I.", key="btn_di"):
+            if st.button("Calcular e Guardar Risco de D.I.", key="btn_di"):
                 res, contribs = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
                 params = f"DM: {'Sim' if di_d else 'Não'} | HAS: {'Sim' if di_h else 'Não'} | Cardiopatia: {'Sim' if di_ca else 'Não'} | Cortisol pré-op: {di_co} | Fístula: {'Sim' if di_f else 'Não'} | Tumor Rígido: {'Sim' if di_r else 'Não'}"
                 st.session_state.di_res = (res, contribs)
@@ -541,7 +563,7 @@ if nav == "🏠 Área de Trabalho":
                 
             if st.session_state.di_res is not None:
                 res, contribs = st.session_state.di_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -559,9 +581,9 @@ if nav == "🏠 Área de Trabalho":
             hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?")
             
             if mod_h == "Modelo de Sangue (Cai et al.)":
-                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0)
+                mo = st.number_input("Percentagem de Monócitos no hemograma (%):", 0.0)
                 pt = st.number_input("Tempo de Protrombina (segundos):", 0.0)
-                if st.button("Calcular e Salvar Risco", key="btn_hipo_cai"):
+                if st.button("Calcular e Guardar Risco", key="btn_hipo_cai"):
                     res, contribs = risco_pdh_cai_2023(hp12, mo, pt)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Monócitos: {mo}% | PT: {pt} seg"
                     st.session_state.hipo_res = (res, contribs)
@@ -569,7 +591,7 @@ if nav == "🏠 Área de Trabalho":
             else:
                 pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0)
                 dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0)
-                if st.button("Calcular e Salvar Risco", key="btn_hipo_tan"):
+                if st.button("Calcular e Guardar Risco", key="btn_hipo_tan"):
                     res, contribs = risco_pdh_tan_2025(pr, dia, hp12)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina: {pr} | Diafragma: {dia} mm"
                     st.session_state.hipo_res = (res, contribs)
@@ -577,7 +599,7 @@ if nav == "🏠 Área de Trabalho":
                     
             if st.session_state.hipo_res is not None:
                 res, contribs = st.session_state.hipo_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -598,7 +620,7 @@ if nav == "🏠 Área de Trabalho":
             with m2: 
                 mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0)
             
-            if st.button("Calcular e Salvar Risco de Meningite", key="btn_meningite"):
+            if st.button("Calcular e Guardar Risco de Meningite", key="btn_meningite"):
                 res, contribs = risco_meningite_zhou_2025(md, mt, mf)
                 params = f"Duração Cirurgia: {md} horas | Diâmetro do Tumor: {mt} cm | Fístula Intraop: {'Sim' if mf else 'Não'}"
                 st.session_state.meningite_res = (res, contribs)
@@ -606,7 +628,7 @@ if nav == "🏠 Área de Trabalho":
                 
             if st.session_state.meningite_res is not None:
                 res, contribs = st.session_state.meningite_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -624,12 +646,12 @@ if nav == "🏠 Área de Trabalho":
             with ch1:
                 chen_res_op = st.selectbox("Extensão da Ressecção Cirúrgica:", ["Ressecção Total (GTR > 95%)", "Ressecção Quase Total (NTR 90-95%)", "Ressecção Subtotal (STR 70-90%)", "Ressecção Parcial (PR < 70%)"])
                 chen_knosp = st.selectbox("Classificação de Knosp (RM Pré-op):", ["Graus 0 - 1", "Graus 2 - 3", "Grau 4"])
-                chen_tabagismo = st.toggle("O paciente possui histórico de tabagismo?")
+                chen_tabagismo = st.toggle("O doente possui histórico de tabagismo?")
             with ch2:
                 chen_ki67 = st.toggle("Índice de proliferação tumoral Ki-67 ≥ 3%?")
                 chen_bmi = st.toggle("Índice de Massa Corporal (IMC) ≥ 25 kg/m²?")
                 
-            if st.button("Calcular e Salvar Risco de Recidiva", key="btn_chen"):
+            if st.button("Calcular e Guardar Risco de Recidiva", key="btn_chen"):
                 res, contribs = risco_progressao_chen_2021(chen_res_op, chen_knosp, chen_ki67, chen_bmi, chen_tabagismo)
                 params = f"Ressecção: {chen_res_op} | Knosp: {chen_knosp} | Ki-67 ≥3%: {'Sim' if chen_ki67 else 'Não'} | IMC ≥25: {'Sim' if chen_bmi else 'Não'} | Tabaco: {'Sim' if chen_tabagismo else 'Não'}"
                 st.session_state.chen_res = (res, contribs)
@@ -637,7 +659,7 @@ if nav == "🏠 Área de Trabalho":
                 
             if st.session_state.chen_res is not None:
                 res, contribs = st.session_state.chen_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -653,7 +675,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='input-card'><h4>🧬 Acromegalia (Remissão)</h4>", unsafe_allow_html=True)
             ac1, ac2 = st.columns(2)
             with ac1:
-                acro_idade = st.number_input("Idade do paciente no diagnóstico (anos):", 0)
+                acro_idade = st.number_input("Idade do doente no diagnóstico (anos):", 0)
                 acro_diam = st.number_input("Diâmetro máximo do tumor na RM (cm):", 0.0, step=0.1)
                 acro_knosp = st.selectbox("Classificação de Knosp:", ["Grau 0", "Grau 1", "Grau 2", "Grau 3A", "Grau 3B", "Grau 4"])
             with ac2:
@@ -668,7 +690,7 @@ if nav == "🏠 Área de Trabalho":
                 
             if st.session_state.acro_res is not None:
                 res, contribs = st.session_state.acro_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -680,7 +702,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[9]:
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de <b>recorrência ou progressão tumoral</b> a longo prazo para pacientes do <b>sexo masculino</b> com NFPA.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de <b>recorrência ou progressão tumoral</b> a longo prazo para doentes do <b>sexo masculino</b> com NFPA.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>📉 Recidiva em NFPA (Homens)</h4>", unsafe_allow_html=True)
             nf1, nf2 = st.columns(2)
             with nf1:
@@ -698,7 +720,7 @@ if nav == "🏠 Área de Trabalho":
                 
             if st.session_state.nfpa_res is not None:
                 res, contribs = st.session_state.nfpa_res
-                st.success("Cálculo realizado e salvo com sucesso!")
+                st.success("Cálculo realizado e guardado com sucesso!")
                 
                 col_g, col_x = st.columns([1, 1.5])
                 with col_g:
@@ -710,55 +732,51 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         # =======================================================
-        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA)
+        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA DA BASE DE DADOS)
         # =======================================================
         with painel_placeholder.container():
             st.subheader("📊 Resultados Consolidados e Arquivados")
-            if os.path.exists(ARQUIVO_CSV):
-                df_h = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-                df_p = df_h[df_h['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
-                if not df_p.empty:
-                    df_l = df_p.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
-                    cols = st.columns(3)
-                    for i, r in df_l.iterrows():
-                        v = float(r['Resultado (%)'])
-                        _, cor = obter_classificacao(v, r['Tipo'])
-                        with cols[i % 3]:
-                            st.markdown(f"""
-                            <div class="dashboard-card b-{cor}">
-                                <div>
-                                    <div style="font-weight:700; opacity:0.8; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">{r["Avaliação Clínica"]}</div>
-                                    <div class="card-value t-{cor}">{v}%</div>
-                                </div>
-                                <div>
-                                    <div style="font-weight:bold; font-size: 1.1rem;" class="t-{cor}">{r["Classificação"]}</div>
-                                    <div style="font-size:0.8rem; opacity:0.6; margin-top: 8px;">{r["Data/Hora"]}</div>
-                                </div>
-                            </div><br>
-                            """, unsafe_allow_html=True)
-                else: 
-                    st.info("Nenhum cálculo salvo ainda. Realize as avaliações nas abas acima.")
+            df_p = obter_df_paciente(st.session_state.paciente_ativo['prontuario'])
+            if not df_p.empty:
+                df_l = df_p.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
+                cols = st.columns(3)
+                for i, r in df_l.iterrows():
+                    v = float(r['Resultado (%)'])
+                    _, cor = obter_classificacao(v, r['Tipo'])
+                    with cols[i % 3]:
+                        st.markdown(f"""
+                        <div class="dashboard-card b-{cor}">
+                            <div>
+                                <div style="font-weight:700; opacity:0.8; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">{r["Avaliação Clínica"]}</div>
+                                <div class="card-value t-{cor}">{v}%</div>
+                            </div>
+                            <div>
+                                <div style="font-weight:bold; font-size: 1.1rem;" class="t-{cor}">{r["Classificação"]}</div>
+                                <div style="font-size:0.8rem; opacity:0.6; margin-top: 8px;">{r["Data/Hora"]}</div>
+                            </div>
+                        </div><br>
+                        """, unsafe_allow_html=True)
+            else: 
+                st.info("Nenhum cálculo salvo ainda. Realize as avaliações nas abas acima.")
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
             linhas_html = ""
-            if os.path.exists(ARQUIVO_CSV):
-                df_rel = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
-                df_rel_pac = df_rel[df_rel['Prontuário'] == str(st.session_state.paciente_ativo['prontuario'])]
-                
-                if not df_rel_pac.empty:
-                    df_latest_rel = df_rel_pac.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
-                    for _, r in df_latest_rel.iterrows():
-                        param_str = r.get("Parâmetros Inseridos", "-")
-                        if pd.isna(param_str): param_str = "-"
-                        linhas_html += f"""
-                        <tr>
-                            <td style="font-weight: bold; color: #0b2e59;">{r['Avaliação Clínica']}</td>
-                            <td style="font-size: 12px; color: #555;">{param_str}</td>
-                            <td style="font-weight: bold; text-align: center; color: #333;">{r['Resultado (%)']}%</td>
-                            <td style="text-align: center; color: #333;">{r['Classificação']}</td>
-                        </tr>
-                        """
+            df_rel_pac = obter_df_paciente(st.session_state.paciente_ativo['prontuario'])
+            
+            if not df_rel_pac.empty:
+                df_latest_rel = df_rel_pac.sort_values(by="Data/Hora").groupby("Avaliação Clínica").last().reset_index()
+                for _, r in df_latest_rel.iterrows():
+                    param_str = r.get("Parâmetros Inseridos", "-")
+                    if pd.isna(param_str): param_str = "-"
+                    linhas_html += f"""
+                    <tr>
+                        <td style="font-weight: bold; color: #0b2e59;">{r['Avaliação Clínica']}</td>
+                        <td style="font-size: 12px; color: #555;">{param_str}</td>
+                        <td style="font-weight: bold; text-align: center; color: #333;">{r['Resultado (%)']}%</td>
+                        <td style="text-align: center; color: #333;">{r['Classificação']}</td>
+                    </tr>
+                    """
             
             html_relatorio = f"""
             <html>
@@ -783,15 +801,15 @@ if nav == "🏠 Área de Trabalho":
             </head>
             <body>
                 <div style="width: 210mm; max-width: 100%;">
-                    <div class="no-print"><button class="print-button" onclick="window.print()">🖨️ CLIQUE AQUI PARA IMPRIMIR OU SALVAR EM PDF</button></div>
+                    <div class="no-print"><button class="print-button" onclick="window.print()">🖨️ CLIQUE AQUI PARA IMPRIMIR OU GUARDAR EM PDF</button></div>
                     <div class="a4-page">
                         <div class="header">
                             <h1>Hospital Universitário Getúlio Vargas</h1>
                             <h3>NeuroPreditor Harvey - Relatório de Avaliação Preditiva</h3>
                         </div>
                         <div class="patient-box">
-                            <p><b>Paciente:</b> {st.session_state.paciente_ativo['nome']}</p>
-                            <p><b>Registro / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
+                            <p><b>Doente:</b> {st.session_state.paciente_ativo['nome']}</p>
+                            <p><b>Registo / Prontuário:</b> {st.session_state.paciente_ativo['prontuario']}</p>
                             <p><b>Nome da Mãe:</b> {st.session_state.paciente_ativo['mae']}</p>
                             <p><b>Data da Emissão:</b> {datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")}</p>
                         </div>
@@ -803,7 +821,7 @@ if nav == "🏠 Área de Trabalho":
                                 <th style="width: 12%;">Resultado</th>
                                 <th style="width: 18%;">Classificação</th>
                             </tr>
-                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até o momento.</td></tr>'}
+                            {linhas_html if linhas_html else '<tr><td colspan="4" style="text-align:center; color: #333; padding: 20px;">Nenhuma avaliação realizada até ao momento.</td></tr>'}
                         </table>
                         <div class="footer">
                             <p style="margin: 0; font-weight: bold; color: #333;">NeuroPreditor Harvey • HUGV - UFAM</p>
@@ -820,19 +838,31 @@ if nav == "🏠 Área de Trabalho":
 # HISTÓRICO GERAL
 # ==========================================
 elif nav == "⚙️ Histórico Geral":
-    st.title("⚙️ Gerenciamento de Dados Clínicos")
-    if os.path.exists(ARQUIVO_CSV):
-        df_g = pd.read_csv(ARQUIVO_CSV, dtype={'Prontuário': str})
+    st.title("⚙️ Gestão de Dados Clínicos")
+    df_g = obter_df_completo()
+    
+    if not df_g.empty:
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
+        st.download_button("📥 Exportar Base de Dados (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_harvey_db.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Excluir Registro do Sistema")
-        lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
-        del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
-        if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
+        st.subheader("🗑️ Eliminar Registo do Sistema")
+        
+        # Obter lista de doentes únicos para exclusão
+        conn = sqlite3.connect(DB_NAME)
+        df_unicos = pd.read_sql("SELECT DISTINCT prontuario, paciente FROM avaliacoes", conn)
+        conn.close()
+        
+        lista_d = [""] + [f"{r['prontuario']} - {r['paciente']}" for _, r in df_unicos.iterrows()]
+        del_sel = st.selectbox("Selecione o doente para apagar permanentemente:", lista_d)
+        
+        if st.button("🚨 CONFIRMAR ELIMINAÇÃO") and del_sel:
             id_d = del_sel.split(" - ")[0]
-            df_g[df_g['Prontuário'] != id_d].to_csv(ARQUIVO_CSV, index=False, encoding='utf-8')
-            st.success("Registro removido com sucesso."); st.rerun()
-    else: st.info("Nenhum dado registrado.")
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("DELETE FROM avaliacoes WHERE prontuario = ?", (id_d,))
+            conn.commit()
+            conn.close()
+            st.success("Registo removido com sucesso da base de dados SQLite."); st.rerun()
+    else: st.info("Nenhum dado registado na base de dados.")
 
 st.markdown("<div class='watermark'>Made By Vinícius Bacelar Ferreira</div>", unsafe_allow_html=True)
