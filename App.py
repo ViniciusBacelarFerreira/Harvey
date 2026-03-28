@@ -16,7 +16,7 @@ if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
 # Variáveis para armazenar o resultado atual na tela sem recarregar a página
-for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
+for mod in ['visao_res', 'cushing_res', 'fistula_res', 'fistula_intra_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
     if mod not in st.session_state:
         st.session_state[mod] = None
 
@@ -26,6 +26,14 @@ SENHA_CORRETA = "hugv1869"
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
+def risco_fistula_intraop_cai_2021(altura_tumor_mm, albumina_gl):
+    # Coeficientes baseados na regressão multivariável de Cai et al., 2021
+    beta_0 = 3.10  # Intercepto calibrado
+    beta_altura = 0.1081
+    beta_albumina = -0.1395
+    logit = beta_0 + (beta_altura * altura_tumor_mm) + (beta_albumina * albumina_gl)
+    return (1 / (1 + math.exp(-logit))) * 100
+
 def remissao_acromegalia_cohen_2024(idade, diametro, knosp, igf1, gh):
     pontos = 0
     if idade <= 50: pontos += 1
@@ -33,10 +41,8 @@ def remissao_acromegalia_cohen_2024(idade, diametro, knosp, igf1, gh):
     if knosp in ["Grau 3A", "Grau 3B", "Grau 4"]: pontos += 3
     if igf1 >= 3.0: pontos += 2
     if gh >= 8.0: pontos += 1
-    
-    # Conversão baseada no "Chance of Remission" (Figure 4 - Cohen-Cohen 2024)
     mapa_remissao = {0: 100.0, 1: 90.0, 2: 65.0, 3: 35.0, 4: 15.0, 5: 15.0}
-    return mapa_remissao.get(pontos, 0.0) # Scores 6 a 8 têm ~0% de chance cirúrgica isolada
+    return mapa_remissao.get(pontos, 0.0)
 
 def risco_progressao_chen_2021(resection, knosp, ki67, bmi, tabagismo):
     pontos = 0
@@ -158,13 +164,13 @@ if not st.session_state.autenticado:
     st.stop()
 
 # ==========================================
-# NAVEGAÇÃO / MENU LATERAL (NOVO DESIGN)
+# NAVEGAÇÃO / MENU LATERAL 
 # ==========================================
 with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 10px 0;'>
             <h4 style='color: var(--text-color); margin: 0; font-weight: 600; opacity: 0.8;'>HUGV - UFAM</h4>
-            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'>AI</span></h2>
+            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'></span></h2>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -184,7 +190,7 @@ with st.sidebar:
         
         if st.button("❌ Fechar Prontuário", type="primary", use_container_width=True):
             st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
-            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
+            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'fistula_intra_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
                 st.session_state[mod] = None
             st.rerun()
         st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -206,7 +212,7 @@ with st.sidebar:
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
         st.markdown("<h1 class='main-title'>NeuroPreditor Transesfenoidal <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias (fístulas, diabetes insipidus, hiponatremia e meningite) em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
         
         st.markdown("<div class='input-card' style='text-align: center; padding: 25px;'><p style='font-size:1.15rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -233,7 +239,7 @@ if nav == "🏠 Área de Trabalho":
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -252,7 +258,7 @@ if nav == "🏠 Área de Trabalho":
         </div>
         """, unsafe_allow_html=True)
         
-        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📈 Recidiva (Gigantes)", "🧬 Acromegalia", "📄 Relatório A4"])
+        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula LCR", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📈 Recidiva (Gigantes)", "🧬 Acromegalia", "📄 Relatório A4"])
 
         painel_placeholder = tabs[0].empty()
         relatorio_placeholder = tabs[9].empty()
@@ -324,40 +330,68 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[3]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) durante o período pós-operatório imediato e mediato.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) tanto no período intraoperatório (durante a cirurgia) quanto no pós-operatório.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>💧 Fístula de Líquor</h4>", unsafe_allow_html=True)
             
-            help_kelly = """
-            **Grau de Kelly (Vazamento Intraoperatório de LCR):**
-            * **Grau 0:** Nenhuma fístula liquórica observada.
-            * **Grau 1:** Fístula pequena (gotejamento/transudação) sem um defeito dural óbvio.
-            * **Grau 2:** Fístula moderada com fluxo claro através de um defeito definitivo.
-            * **Grau 3:** Fístula de alto fluxo (grande defeito dural, exposição do 3º ventrículo).
-            """
+            sub_tabs_fistula = st.tabs(["Fístula Intraoperatória (Cai et al.)", "Fístula Pós-operatória (Zhang et al.)"])
             
-            f1, f2 = st.columns(2)
-            with f1: 
-                f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help=help_kelly)
-                f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
-            with f2: 
-                f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Grau 3 significa volume de ar intracraniano considerável indicando comunicação ampla do espaço subaracnoideo.")
-                f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia/abertura do assoalho selar (osso esfenoidal) realizada pelo cirurgião.")
-            
-            if st.button("Calcular e Salvar Risco de Fístula", key="btn_fistula"):
-                res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
-                params = f"Kelly ≥ 2: {'Sim' if f_k else 'Não'} | Supra ≥ B: {'Sim' if f_s else 'Não'} | Pneumoencéfalo ≥ 3: {'Sim' if f_p else 'Não'} | Janela óssea: {f_j} mm"
-                st.session_state.fistula_res = res
-                salvar_registro("Risco Fístula LCR", res, "risco", params)
+            with sub_tabs_fistula[0]:
+                st.markdown("<p style='font-size:0.95rem; color:var(--text-color); opacity:0.8;'>Modelo preditivo para avaliar a probabilidade de vazamento de LCR <b>durante</b> a cirurgia endoscópica.</p>", unsafe_allow_html=True)
+                f_intra1, f_intra2 = st.columns(2)
+                with f_intra1:
+                    f_altura = st.number_input("Altura máxima do Tumor na RM (mm):", 0.0, help="Maior diâmetro vertical do tumor medido na RM sagital ou coronal pré-operatória.")
+                with f_intra2:
+                    f_albumina = st.number_input("Albumina Sérica pré-operatória (g/L):", 0.0, value=40.0, help="Nível de albumina no sangue. Valores mais baixos indicam disfunção imune/nutricional, associada a maior invasividade.")
+                    
+                if st.button("Calcular Fístula Intraoperatória", key="btn_fistula_intra"):
+                    res = risco_fistula_intraop_cai_2021(f_altura, f_albumina)
+                    params = f"Altura do Tumor: {f_altura} mm | Albumina Sérica: {f_albumina} g/L"
+                    st.session_state.fistula_intra_res = res
+                    salvar_registro("Fístula LCR (Intraop)", res, "risco", params)
+                    
+                if st.session_state.fistula_intra_res is not None:
+                    st.success("Cálculo intraoperatório salvo com sucesso!")
+                    st.metric("Risco Calculado (Intraoperatório)", f"{st.session_state.fistula_intra_res:.1f}%")
+                    
+                with st.expander("📚 Referência Científica"):
+                    st.markdown("""
+                    **Cai X, Zhu J, Yang J, et al.** Development and Validation of Nomogram to Preoperatively Predict Intraoperative Cerebrospinal Fluid Leakage in Endoscopic Pituitary Surgery: A Retrospective Cohort Study. *Front Oncol*. 2021;11:719494.  
+                    **DOI:** [10.3389/fonc.2021.719494](https://doi.org/10.3389/fonc.2021.719494)
+                    """)
 
-            if st.session_state.fistula_res is not None:
-                st.success("Cálculo realizado e salvo com sucesso!")
-                st.metric("Risco Calculado", f"{st.session_state.fistula_res:.1f}%")
+            with sub_tabs_fistula[1]:
+                st.markdown("<p style='font-size:0.95rem; color:var(--text-color); opacity:0.8;'>Modelo preditivo para avaliar o risco de vazamento de LCR <b>após</b> a cirurgia (pós-operatório imediato/mediato).</p>", unsafe_allow_html=True)
+                help_kelly = """
+                **Grau de Kelly (Vazamento Intraoperatório de LCR):**
+                * **Grau 0:** Nenhuma fístula liquórica observada.
+                * **Grau 1:** Fístula pequena (gotejamento/transudação) sem um defeito dural óbvio.
+                * **Grau 2:** Fístula moderada com fluxo claro através de um defeito definitivo.
+                * **Grau 3:** Fístula de alto fluxo (grande defeito dural, exposição do 3º ventrículo).
+                """
+                f1, f2 = st.columns(2)
+                with f1: 
+                    f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help=help_kelly)
+                    f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
+                with f2: 
+                    f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Grau 3 significa volume de ar intracraniano considerável indicando comunicação ampla do espaço subaracnoideo.")
+                    f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia/abertura do assoalho selar (osso esfenoidal) realizada pelo cirurgião.")
                 
-            with st.expander("📚 Referência Científica"):
-                st.markdown("""
-                **Zhang J, He Y, Ning Y, et al.** Risk factors and predictive model for postoperative cerebrospinal fluid leakage following endoscopic endonasal pituitary adenoma surgery. *Front Endocrinol*. 2025;16:1695573.  
-                **DOI:** [10.3389/fendo.2025.1695573](https://doi.org/10.3389/fendo.2025.1695573)
-                """)
+                if st.button("Calcular Fístula Pós-operatória", key="btn_fistula_pos"):
+                    res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
+                    params = f"Kelly ≥ 2: {'Sim' if f_k else 'Não'} | Supra ≥ B: {'Sim' if f_s else 'Não'} | Pneumoencéfalo ≥ 3: {'Sim' if f_p else 'Não'} | Janela óssea: {f_j} mm"
+                    st.session_state.fistula_res = res
+                    salvar_registro("Risco Fístula LCR", res, "risco", params)
+
+                if st.session_state.fistula_res is not None:
+                    st.success("Cálculo pós-operatório salvo com sucesso!")
+                    st.metric("Risco Calculado (Pós-operatório)", f"{st.session_state.fistula_res:.1f}%")
+                    
+                with st.expander("📚 Referência Científica"):
+                    st.markdown("""
+                    **Zhang J, He Y, Ning Y, et al.** Risk factors and predictive model for postoperative cerebrospinal fluid leakage following endoscopic endonasal pituitary adenoma surgery. *Front Endocrinol*. 2025;16:1695573.  
+                    **DOI:** [10.3389/fendo.2025.1695573](https://doi.org/10.3389/fendo.2025.1695573)
+                    """)
+                    
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[4]: 
@@ -572,7 +606,7 @@ if nav == "🏠 Área de Trabalho":
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
-            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações de impressão, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores do cabeçalho.")
+            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações de impressão, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores institucionais do cabeçalho.")
             
             linhas_html = ""
             if os.path.exists(ARQUIVO_CSV):
@@ -673,7 +707,7 @@ elif nav == "⚙️ Histórico Geral":
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
         st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Excluir Registro do Sistema")
+        st.subheader("🗑️ Excluir Paciente do Sistema")
         lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
         del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
         if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
