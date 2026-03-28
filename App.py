@@ -16,7 +16,8 @@ if 'paciente_ativo' not in st.session_state:
     st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
 
 # Variáveis para armazenar o resultado atual na tela sem recarregar a página
-for mod in ['visao_res', 'cushing_res', 'fistula_res', 'fistula_intra_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
+lista_modulos = ['visao_res', 'cushing_res', 'fistula_intra_res', 'fistula_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res', 'nfpa_res']
+for mod in lista_modulos:
     if mod not in st.session_state:
         st.session_state[mod] = None
 
@@ -26,9 +27,20 @@ SENHA_CORRETA = "hugv1869"
 # ==========================================
 # FUNÇÕES DE CÁLCULO (BACK-END)
 # ==========================================
+def risco_progressao_nfpa_zhong_2024(ki67_high, knosp_high, resseccao_subtotal):
+    # Coeficientes (B) calculados a partir dos Odds Ratios do estudo (Fig. 2)
+    beta_0 = -4.0 # Intercepto calibrado para o risco base
+    beta_ki67 = 1.671 # ln(5.319)
+    beta_knosp = 2.296 # ln(9.932)
+    beta_res = 1.771 # ln(5.876)
+    
+    logit = beta_0 + (beta_ki67 * (1 if ki67_high else 0)) + \
+            (beta_knosp * (1 if knosp_high else 0)) + \
+            (beta_res * (1 if resseccao_subtotal else 0))
+    return (1 / (1 + math.exp(-logit))) * 100
+
 def risco_fistula_intraop_cai_2021(altura_tumor_mm, albumina_gl):
-    # Coeficientes baseados na regressão multivariável de Cai et al., 2021
-    beta_0 = 3.10  # Intercepto calibrado
+    beta_0 = 3.10
     beta_altura = 0.1081
     beta_albumina = -0.1395
     logit = beta_0 + (beta_altura * altura_tumor_mm) + (beta_albumina * albumina_gl)
@@ -170,7 +182,7 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 10px 0;'>
             <h4 style='color: var(--text-color); margin: 0; font-weight: 600; opacity: 0.8;'>HUGV - UFAM</h4>
-            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'></span></h2>
+            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'>AI</span></h2>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -190,7 +202,7 @@ with st.sidebar:
         
         if st.button("❌ Fechar Prontuário", type="primary", use_container_width=True):
             st.session_state.paciente_ativo = {"nome": "", "mae": "", "prontuario": ""}
-            for mod in ['visao_res', 'cushing_res', 'fistula_res', 'fistula_intra_res', 'di_res', 'hipo_res', 'meningite_res', 'chen_res', 'acro_res']:
+            for mod in lista_modulos:
                 st.session_state[mod] = None
             st.rerun()
         st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -239,7 +251,7 @@ if nav == "🏠 Área de Trabalho":
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -258,21 +270,21 @@ if nav == "🏠 Área de Trabalho":
         </div>
         """, unsafe_allow_html=True)
         
-        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula LCR", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📈 Recidiva (Gigantes)", "🧬 Acromegalia", "📄 Relatório A4"])
+        tabs = st.tabs(["📊 Painel Visual", "👁️ Visão", "🔄 Cushing", "💧 Fístula LCR", "🚰 D.I.", "🧂 Sódio", "🦠 Meningite", "📈 Recidiva (Gigantes)", "🧬 Acromegalia", "📉 NFPA (Homens)", "📄 Relatório A4"])
 
         painel_placeholder = tabs[0].empty()
-        relatorio_placeholder = tabs[9].empty()
+        relatorio_placeholder = tabs[10].empty()
 
         with tabs[1]: 
             st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima a probabilidade de melhora visual ou recuperação do campo visual do paciente após a descompressão cirúrgica.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>👁️ Recuperação Visual</h4>", unsafe_allow_html=True)
             v1, v2 = st.columns(2)
             with v1: 
-                v_q = st.toggle("Havia compressão do quiasma óptico?", help="Avaliado por ressonância magnética (RM) coronal. A compressão direta piora o basal, mas tem grande potencial de descompressão.")
-                v_d = st.toggle("Apresentava defeito campimétrico difuso?", help="Depressão generalizada da sensibilidade em toda a campimetria visual computadorizada.")
+                v_q = st.toggle("Havia compressão do quiasma óptico?")
+                v_d = st.toggle("Apresentava defeito campimétrico difuso?")
             with v2: 
-                v_m = st.number_input("Duração dos sintomas visuais (meses):", 0, help="Tempo total em meses desde que o paciente notou a primeira alteração na visão.")
-                v_md = st.number_input("Mean Defect (MD) pré-operatório (dB):", 0.0, help="Valor do 'Mean Defect' (em módulo) extraído do exame de campo visual computadorizado.")
+                v_m = st.number_input("Duração dos sintomas visuais (meses):", 0)
+                v_md = st.number_input("Mean Defect (MD) pré-operatório (dB):", 0.0)
             
             if st.button("Calcular e Salvar Probabilidade Visual", key="btn_visao"):
                 res = risco_melhora_visual_ji_2023(v_q, v_d, v_m, v_md)
@@ -306,11 +318,11 @@ if nav == "🏠 Área de Trabalho":
             
             c1, c2 = st.columns(2)
             with c1: 
-                c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1", help="Tempo de exposição clínica documentada aos sinais/sintomas do hipercortisolismo.")
-                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?", help="Se a cirurgia atual for uma reabordagem, o risco de falha aumenta significativamente.")
+                c_dur = st.number_input("Duração dos sintomas antes da cirurgia (meses):", 0, key="c1")
+                c_cp = st.toggle("O paciente possui cirurgia pituitária prévia?")
             with c2: 
                 c_h = st.select_slider("Classificação de Invasão de Hardy:", [0,1,2,3,4], value=2, help=help_hardy)
-                c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"], help="Baseado na interpretação da Ressonância Dinâmica da Sela Túrcica.")
+                c_l = st.selectbox("Localização predominante do Tumor na RM:", ["Bilateral","Direita","Esquerda","Central","Haste"])
             
             if st.button("Calcular e Salvar Risco de Recorrência", key="btn_cushing"):
                 res = risco_recorrencia_cushing_cuper_2025(c_dur, c_h, c_l, c_cp)
@@ -330,7 +342,7 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[3]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) tanto no período intraoperatório (durante a cirurgia) quanto no pós-operatório.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Avalia o risco de fístula liquórica (vazamento de LCR) tanto no período intraoperatório quanto no pós-operatório.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>💧 Fístula de Líquor</h4>", unsafe_allow_html=True)
             
             sub_tabs_fistula = st.tabs(["Fístula Intraoperatória (Cai et al.)", "Fístula Pós-operatória (Zhang et al.)"])
@@ -339,9 +351,9 @@ if nav == "🏠 Área de Trabalho":
                 st.markdown("<p style='font-size:0.95rem; color:var(--text-color); opacity:0.8;'>Modelo preditivo para avaliar a probabilidade de vazamento de LCR <b>durante</b> a cirurgia endoscópica.</p>", unsafe_allow_html=True)
                 f_intra1, f_intra2 = st.columns(2)
                 with f_intra1:
-                    f_altura = st.number_input("Altura máxima do Tumor na RM (mm):", 0.0, help="Maior diâmetro vertical do tumor medido na RM sagital ou coronal pré-operatória.")
+                    f_altura = st.number_input("Altura máxima do Tumor na RM (mm):", 0.0)
                 with f_intra2:
-                    f_albumina = st.number_input("Albumina Sérica pré-operatória (g/L):", 0.0, value=40.0, help="Nível de albumina no sangue. Valores mais baixos indicam disfunção imune/nutricional, associada a maior invasividade.")
+                    f_albumina = st.number_input("Albumina Sérica pré-operatória (g/L):", 0.0, value=40.0)
                     
                 if st.button("Calcular Fístula Intraoperatória", key="btn_fistula_intra"):
                     res = risco_fistula_intraop_cai_2021(f_altura, f_albumina)
@@ -371,10 +383,10 @@ if nav == "🏠 Área de Trabalho":
                 f1, f2 = st.columns(2)
                 with f1: 
                     f_k = st.toggle("Grau de Kelly intraoperatório ≥ 2?", help=help_kelly)
-                    f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?", help="Extensão do tumor para as cisternas suprasselares, deslocando ou elevando o quiasma óptico.")
+                    f_s = st.toggle("Extensão suprasselar do tumor ≥ Grau B?")
                 with f2: 
-                    f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?", help="Grau 3 significa volume de ar intracraniano considerável indicando comunicação ampla do espaço subaracnoideo.")
-                    f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0, help="Diâmetro da craniectomia/abertura do assoalho selar (osso esfenoidal) realizada pelo cirurgião.")
+                    f_p = st.toggle("Pneumoencéfalo pós-operatório ≥ Grau 3 na TC?")
+                    f_j = st.number_input("Tamanho estimado da janela óssea selar (mm):", 0.0)
                 
                 if st.button("Calcular Fístula Pós-operatória", key="btn_fistula_pos"):
                     res = risco_fistula_lcr_zhang_2025(f_k, f_s, f_p, f_j)
@@ -403,9 +415,9 @@ if nav == "🏠 Área de Trabalho":
                 di_h = st.checkbox("O paciente possui Hipertensão Arterial Sistêmica?")
                 di_ca = st.checkbox("O paciente possui Cardiopatia prévia?")
             with d2: 
-                di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0, help="Nível de cortisol sérico obtido preferencialmente às 8h da manhã.")
+                di_co = st.number_input("Nível de Cortisol basal pré-operatório (mmol/L):", 0.0)
                 di_f = st.toggle("Apresentou fístula liquórica documentada no pós-operatório?")
-                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?", help="Tumores duros exigem maior tração e curetagem, aumentando o risco mecânico adjacente à haste hipofisária.")
+                di_r = st.toggle("A textura do tumor era firme/rígida na avaliação intraoperatória?")
             
             if st.button("Calcular e Salvar Risco de D.I.", key="btn_di"):
                 res = risco_diabetes_insipidus_li_2024(di_d, di_h, di_ca, di_co, di_f, di_r)
@@ -425,22 +437,22 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
-            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (Delayed Postoperative Hyponatremia - DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório (fase secundária de SIADH).</div>", unsafe_allow_html=True)
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Risco de Hiponatremia Tardia (Delayed Postoperative Hyponatremia - DPH), usualmente ocorrendo entre o 4º e o 7º dia pós-operatório.</div>", unsafe_allow_html=True)
             st.markdown("<div class='input-card'><h4>🧂 Hiponatremia Tardia (DPH)</h4>", unsafe_allow_html=True)
             mod_h = st.radio("Selecione a base do modelo preditivo:", ["Modelo de Sangue (Cai et al.)", "Modelo de Imagem/Hormonal (Tan et al.)"])
-            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?", help="Sódio em declínio na fase aguda é um preditor clínico muito forte do desenvolvimento de SIADH tardia.")
+            hp12 = st.toggle("Houve queda do Sódio sérico nos Dias 1 e 2 pós-op?")
             
             if mod_h == "Modelo de Sangue (Cai et al.)":
-                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0, help="O valor de monócitos relativos obtidos no hemograma de rotina pós-operatório.")
-                pt = st.number_input("Tempo de Protrombina (segundos):", 0.0, help="Tempo de coagulação em segundos (PT/TAP).")
+                mo = st.number_input("Porcentagem de Monócitos no hemograma (%):", 0.0)
+                pt = st.number_input("Tempo de Protrombina (segundos):", 0.0)
                 if st.button("Calcular e Salvar Risco (Modelo Cai)", key="btn_hipo_cai"):
                     res = risco_pdh_cai_2023(hp12, mo, pt)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Monócitos: {mo}% | Tempo de Protrombina: {pt} seg"
                     st.session_state.hipo_res = res
                     salvar_registro("DPH (Modelo Cai)", res, "risco", params)
             else:
-                pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0, help="Nível sérico medido no sangue antes da cirurgia.")
-                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0, help="Elevação do diafragma selar acima da linha basilar na RM sagital/coronal.")
+                pr = st.number_input("Nível de Prolactina basal pré-op (ng/mL):", 0.0)
+                dia = st.number_input("Elevação estimada do Diafragma Selar (mm):", 0.0)
                 if st.button("Calcular e Salvar Risco (Modelo Tan)", key="btn_hipo_tan"):
                     res = risco_pdh_tan_2025(pr, dia, hp12)
                     params = f"Queda Sódio D1-D2: {'Sim' if hp12 else 'Não'} | Prolactina pré-op: {pr} ng/mL | Elevação Diafragma: {dia} mm"
@@ -466,10 +478,10 @@ if nav == "🏠 Área de Trabalho":
             st.markdown("<div class='input-card'><h4>🦠 Meningite Pós-operatória</h4>", unsafe_allow_html=True)
             m1, m2 = st.columns(2)
             with m1: 
-                md = st.number_input("Duração total da Cirurgia (horas):", 0.0, help="Tempo cirúrgico prolongado aumenta exponencialmente o risco de contaminação cruzada e meningite (OR 2.68).")
-                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?", help="Vazamento de líquor durante a cirurgia é o principal preditor independente (aumenta o risco em ~9 vezes).")
+                md = st.number_input("Duração total da Cirurgia (horas):", 0.0)
+                mf = st.toggle("Houve fístula de LCR identificada intraoperatória?")
             with m2: 
-                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0, help="A cada 1 cm adicional no tamanho do tumor o risco aumenta em 2.7x, devido à maior complexidade de ressecção e área de exposição.")
+                mt = st.number_input("Diâmetro máximo do Tumor na RM (cm):", 0.0)
             
             if st.button("Calcular e Salvar Risco de Meningite", key="btn_meningite"):
                 res = risco_meningite_zhou_2025(md, mt, mf)
@@ -513,8 +525,8 @@ if nav == "🏠 Área de Trabalho":
                 chen_knosp = st.selectbox("Classificação de Knosp (RM Pré-op):", ["Graus 0 - 1", "Graus 2 - 3", "Grau 4"], help=help_knosp)
                 chen_tabagismo = st.toggle("O paciente possui histórico de tabagismo?")
             with ch2:
-                chen_ki67 = st.toggle("Índice de proliferação tumoral Ki-67 ≥ 3%?", help="Marcador imuno-histoquímico de proliferação celular (geralmente avaliado após a biópsia/cirurgia).")
-                chen_bmi = st.toggle("Índice de Massa Corporal (IMC) ≥ 25 kg/m²?", help="Identifica pacientes com sobrepeso ou obesidade, o que se demonstrou ser um fator de risco associado à recidiva.")
+                chen_ki67 = st.toggle("Índice de proliferação tumoral Ki-67 ≥ 3%?")
+                chen_bmi = st.toggle("Índice de Massa Corporal (IMC) ≥ 25 kg/m²?")
                 
             if st.button("Calcular e Salvar Risco de Recidiva (5 Anos)", key="btn_chen"):
                 res = risco_progressao_chen_2021(chen_res_op, chen_knosp, chen_ki67, chen_bmi, chen_tabagismo)
@@ -540,17 +552,17 @@ if nav == "🏠 Área de Trabalho":
             help_knosp_acro = """
             **Classificação de Knosp (Invasão do Seio Cavernoso):**
             * **Graus 0, 1 e 2:** Tumor não atinge ou não ultrapassa significativamente a linha tangente lateral da artéria carótida interna.
-            * **Graus 3A, 3B e 4:** Tumor ultrapassa a tangente lateral da carótida (compartimentos superior/inferior) ou envolve completamente a artéria. É um preditor negativo de remissão.
+            * **Graus 3A, 3B e 4:** Tumor ultrapassa a tangente lateral da carótida ou envolve completamente a artéria.
             """
             
             ac1, ac2 = st.columns(2)
             with ac1:
-                acro_idade = st.number_input("Idade do paciente no diagnóstico (anos):", 0, help="Idades mais jovens (≤ 50 anos) geralmente estão associadas a um comportamento tumoral mais agressivo e menores taxas de remissão na acromegalia.")
-                acro_diam = st.number_input("Diâmetro máximo do tumor na RM (cm):", 0.0, step=0.1, help="Tumores macroadenomas ≥ 1.5 cm apresentam um risco significativamente maior de doença persistente.")
+                acro_idade = st.number_input("Idade do paciente no diagnóstico (anos):", 0)
+                acro_diam = st.number_input("Diâmetro máximo do tumor na RM (cm):", 0.0, step=0.1)
                 acro_knosp = st.selectbox("Classificação de Invasão de Knosp:", ["Grau 0", "Grau 1", "Grau 2", "Grau 3A", "Grau 3B", "Grau 4"], help=help_knosp_acro)
             with ac2:
-                acro_igf1 = st.number_input("Índice de IGF-1 basal pré-operatório:", 0.0, step=0.1, help="Valor do paciente dividido pelo limite superior do normal para a sua idade/sexo. Um índice ≥ 3.0 afeta negativamente a remissão.")
-                acro_gh = st.number_input("Nível de GH basal no diagnóstico (ng/mL):", 0.0, step=0.1, help="Níveis de GH ≥ 8.0 ng/mL no diagnóstico indicam forte atividade secretória e menor probabilidade de cura isolada por cirurgia.")
+                acro_igf1 = st.number_input("Índice de IGF-1 basal pré-operatório:", 0.0, step=0.1)
+                acro_gh = st.number_input("Nível de GH basal no diagnóstico (ng/mL):", 0.0, step=0.1)
                 
             if st.button("Calcular e Salvar Probabilidade de Remissão", key="btn_acro"):
                 res = remissao_acromegalia_cohen_2024(acro_idade, acro_diam, acro_knosp, acro_igf1, acro_gh)
@@ -571,6 +583,41 @@ if nav == "🏠 Área de Trabalho":
                 st.markdown("""
                 **Cohen-Cohen S, Rindler R, Botello Hernandez E, et al.** A Novel Preoperative Score to Predict Long-Term Biochemical Remission in Patients with Growth-Hormone Secreting Pituitary Adenomas. *World Neurosurg*. 2024;182:e882-e890.  
                 **DOI:** [10.1016/j.wneu.2023.12.076](https://doi.org/10.1016/j.wneu.2023.12.076)
+                """)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with tabs[9]:
+            st.markdown("<div class='calc-info'><b>O que calcula:</b> Estima o risco de <b>recorrência ou progressão tumoral</b> a longo prazo, especificamente para <b>pacientes do sexo masculino</b> com Adenomas Hipofisários Não-Funcionantes (NFPA) após cirurgia transesfenoidal.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='input-card'><h4>📉 Recidiva em NFPA (Homens)</h4>", unsafe_allow_html=True)
+            
+            help_knosp_nfpa = """
+            **Classificação de Knosp Modificada:**
+            * **Graus 0 a 3A:** O tumor não invade o compartimento inferior do seio cavernoso.
+            * **Graus 3B a 4:** O tumor invade o compartimento inferior do seio cavernoso ou envolve completamente a artéria carótida interna. Associado a alto risco de recidiva.
+            """
+            
+            nf1, nf2 = st.columns(2)
+            with nf1:
+                nfpa_knosp = st.toggle("A Classificação de Knosp Modificada é Grau 3B ou 4?", help=help_knosp_nfpa)
+                nfpa_ki67 = st.toggle("O Índice de proliferação Ki-67 é ≥ 3%?", help="Marcador de proliferação celular no exame anatomopatológico.")
+            with nf2:
+                nfpa_res = st.selectbox("Extensão da Ressecção Cirúrgica:", ["Ressecção Total (GTR)", "Ressecção Subtotal/Parcial (STR/PR)"], help="A ressecção incompleta aumenta drasticamente o risco de progressão da doença residual.")
+                
+            if st.button("Calcular e Salvar Risco de Recidiva (NFPA)", key="btn_nfpa"):
+                resseccao_subtotal = True if nfpa_res == "Ressecção Subtotal/Parcial (STR/PR)" else False
+                res = risco_progressao_nfpa_zhong_2024(nfpa_ki67, nfpa_knosp, resseccao_subtotal)
+                params = f"Knosp 3B-4: {'Sim' if nfpa_knosp else 'Não'} | Ki-67 ≥3%: {'Sim' if nfpa_ki67 else 'Não'} | Ressecção: {nfpa_res}"
+                st.session_state.nfpa_res = res
+                salvar_registro("Recidiva NFPA (Homens)", res, "risco", params)
+                
+            if st.session_state.nfpa_res is not None:
+                st.success("Cálculo realizado e salvo com sucesso!")
+                st.metric("Risco Calculado", f"{st.session_state.nfpa_res:.1f}%")
+                
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Zhong J, Chen Y, Wang M, et al.** Risk factor analysis and prediction model to establish recurrence or progression of non-functioning pituitary adenomas in men after transnasal sphenoidal surgery. *Sci Rep*. 2024;14:21607.  
+                **DOI:** [10.1038/s41598-024-72944-5](https://doi.org/10.1038/s41598-024-72944-5)
                 """)
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -707,7 +754,7 @@ elif nav == "⚙️ Histórico Geral":
         st.dataframe(df_g.sort_values(by="Data/Hora", ascending=False), use_container_width=True, hide_index=True)
         st.download_button("📥 Exportar Planilha Completa (CSV)", df_g.to_csv(index=False).encode('utf-8'), "historico_neuro.csv", "text/csv")
         st.markdown("---")
-        st.subheader("🗑️ Excluir Paciente do Sistema")
+        st.subheader("🗑️ Excluir Registro do Sistema")
         lista_d = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_g.drop_duplicates(subset=['Prontuário']).iterrows()]
         del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
         if st.button("🚨 CONFIRMAR EXCLUSÃO") and del_sel:
