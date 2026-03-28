@@ -343,7 +343,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     st.markdown("<div class='sidebar-section-title'>Navegação Principal</div>", unsafe_allow_html=True)
-    nav = st.radio("Módulos:", ["🏠 Área de Trabalho", "📊 Gestão & Análise"], label_visibility="collapsed")
+    nav = st.radio("Módulos:", ["🏠 Área de Trabalho", "📊 Gestão & Analytics"], label_visibility="collapsed")
     st.markdown("<hr style='margin: 15px 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     if st.session_state.paciente_ativo['prontuario']:
