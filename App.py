@@ -182,7 +182,7 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 10px 0;'>
             <h4 style='color: var(--text-color); margin: 0; font-weight: 600; opacity: 0.8;'>HUGV - UFAM</h4>
-            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'>AI</span></h2>
+            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'></span></h2>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -251,7 +251,7 @@ if nav == "🏠 Área de Trabalho":
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
+            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
