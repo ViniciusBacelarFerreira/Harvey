@@ -73,7 +73,7 @@ def init_db():
 init_db()
 
 # ==========================================
-# FUNÇÕES DE XAI E GRÁFICOS
+# FUNÇÕES DE XAI, GRÁFICOS E MÉTRICAS
 # ==========================================
 def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Modelo Matemático)"):
     labels = list(contribuicoes.keys())
@@ -379,7 +379,7 @@ with st.sidebar:
 if nav == "🏠 Área de Trabalho":
     if not st.session_state.paciente_ativo['prontuario']:
         st.markdown("<h1 class='main-title'>NeuroPreditor Transesfenoidal <span class='harvey-text'>Harvey</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica com XAI. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.15rem; opacity: 0.85; max-width: 900px; margin: 15px auto 35px auto;'>Um sistema avançado de apoio à decisão clínica e cirúrgica. Utiliza modelos preditivos matemáticos baseados na literatura científica recente para estimar prognósticos visuais e calcular os riscos de complicações perioperatórias em cirurgias de tumores hipofisários.</p>", unsafe_allow_html=True)
         
         st.markdown("<div class='input-card' style='text-align: center; padding: 25px;'><p style='font-size:1.15rem; font-style:italic;'>\"Gostaria de ver o dia em que alguém fosse nomeado cirurgião sem ter mãos, pois a parte operatória é a menor parte do trabalho.\"</p><p style='color:#b8860b; font-weight:800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;'>— HARVEY WILLIAMS CUSHING</p></div>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -392,15 +392,27 @@ if nav == "🏠 Área de Trabalho":
             conn.close()
             
             if not df_b.empty:
-                lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_b.iterrows()]
-                sel = st.selectbox("Selecione o paciente:", lista)
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("Abrir Prontuário Selecionado", use_container_width=True) and sel:
-                    id_p = sel.split(" - ")[0]
-                    dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
-                    st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
-                    st.rerun()
-            else: st.info("Sem registros na base de dados no momento.")
+                termo_busca = st.text_input("🔍 Buscar por Nome ou Prontuário:", placeholder="Digite para filtrar os pacientes...", label_visibility="collapsed")
+                
+                if termo_busca:
+                    df_filtrado = df_b[df_b['Paciente'].str.contains(termo_busca, case=False, na=False) | 
+                                       df_b['Prontuário'].str.contains(termo_busca, case=False, na=False)]
+                else:
+                    df_filtrado = df_b
+                
+                if not df_filtrado.empty:
+                    lista = [""] + [f"{r['Prontuário']} - {r['Paciente']}" for _, r in df_filtrado.iterrows()]
+                    sel = st.selectbox("Resultados encontrados:", lista)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("Abrir Prontuário Selecionado", use_container_width=True) and sel:
+                        id_p = sel.split(" - ")[0]
+                        dados = df_b[df_b['Prontuário'] == id_p].iloc[0]
+                        st.session_state.paciente_ativo = {"prontuario": id_p, "nome": dados['Paciente'], "mae": dados['Mãe']}
+                        st.rerun()
+                else:
+                    st.warning("Nenhum paciente encontrado com esse termo.")
+            else: 
+                st.info("Sem registros na base de dados no momento.")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with c2:
@@ -912,12 +924,10 @@ elif nav == "📊 Gestão & Analytics":
     df_g = obter_df_completo()
     
     if not df_g.empty:
-        # Extração de Métricas com Regex
         med_idade, med_diam = extrair_metricas_parametros(df_g)
         total_pacientes = df_g['Prontuário'].nunique()
         total_avaliacoes = len(df_g)
         
-        # Exibição de Métricas (KPIs)
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total de Pacientes", total_pacientes)
         col2.metric("Total de Avaliações", total_avaliacoes)
@@ -926,19 +936,14 @@ elif nav == "📊 Gestão & Analytics":
         
         st.markdown("<hr style='opacity: 0.2;'>", unsafe_allow_html=True)
         
-        # Gráficos
         chart_col1, chart_col2 = st.columns(2)
-        
         with chart_col1:
-            # Pie Chart de Classificação
             dist_class = df_g['Classificação'].value_counts()
-            fig_pie = go.Figure(data=[go.Pie(labels=dist_class.index, values=dist_class.values, hole=.4, 
-                                             marker_colors=['#2e7d32', '#ef6c00', '#c62828', '#1565c0'])])
+            fig_pie = go.Figure(data=[go.Pie(labels=dist_class.index, values=dist_class.values, hole=.4, marker_colors=['#2e7d32', '#ef6c00', '#c62828', '#1565c0'])])
             fig_pie.update_layout(title="Distribuição Geral de Risco/Prognóstico", paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with chart_col2:
-            # Bar Chart por Mês
             df_g['Mês'] = pd.to_datetime(df_g['Data/Hora'], format='%d/%m/%Y %H:%M').dt.strftime('%m/%Y')
             dist_mes = df_g['Mês'].value_counts().sort_index()
             fig_bar = go.Figure(data=[go.Bar(x=dist_mes.index, y=dist_mes.values, marker_color='#1565c0')])
@@ -957,6 +962,12 @@ elif nav == "📊 Gestão & Analytics":
         df_unicos = pd.read_sql("SELECT DISTINCT prontuario, paciente FROM avaliacoes", conn)
         conn.close()
         
+        termo_busca_del = st.text_input("🔍 Buscar por Nome ou Prontuário para excluir:", placeholder="Digite para filtrar os pacientes a serem excluídos...", key="del_search")
+        
+        if termo_busca_del:
+            df_unicos = df_unicos[df_unicos['paciente'].str.contains(termo_busca_del, case=False, na=False) | 
+                                  df_unicos['prontuario'].str.contains(termo_busca_del, case=False, na=False)]
+            
         lista_d = [""] + [f"{r['prontuario']} - {r['paciente']}" for _, r in df_unicos.iterrows()]
         del_sel = st.selectbox("Selecione o paciente para apagar permanentemente:", lista_d)
         
