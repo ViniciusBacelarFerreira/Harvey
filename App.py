@@ -73,7 +73,7 @@ def init_db():
 init_db()
 
 # ==========================================
-# FUNÇÕES DE XAI, GRÁFICOS E MÉTRICAS
+# FUNÇÕES DE XAI E GRÁFICOS
 # ==========================================
 def gerar_grafico_waterfall(contribuicoes, titulo="Impacto das Variáveis (Modelo Matemático)"):
     labels = list(contribuicoes.keys())
@@ -337,7 +337,7 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 10px 0;'>
             <h4 style='color: var(--text-color); margin: 0; font-weight: 600; opacity: 0.8;'>HUGV - UFAM</h4>
-            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'></span></h2>
+            <h2 style='color: #1565c0; margin: 5px 0 15px 0; font-weight: 800; letter-spacing: -0.5px;'>Harvey<span style='color: #b8860b;'>AI</span></h2>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0; opacity: 0.2;'>", unsafe_allow_html=True)
@@ -409,7 +409,7 @@ if nav == "🏠 Área de Trabalho":
             nm = st.text_input("Nome da Mãe:")
             np = st.text_input("Número do Prontuário:")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Cadastrar paciente", use_container_width=True) and nn and np:
+            if st.button("Cadastrar e Iniciar Atendimento", use_container_width=True) and nn and np:
                 st.session_state.paciente_ativo = {"nome": nn, "mae": nm, "prontuario": str(np)}
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -463,7 +463,10 @@ if nav == "🏠 Área de Trabalho":
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
                 
             with st.expander("📚 Referência Científica"):
-                st.markdown("**Ji X, Zhuang X, Yang S, et al.** Visual field improvement after endoscopic transsphenoidal surgery... *Front Oncol*. 2023;13:1108883.")
+                st.markdown("""
+                **Ji X, Zhuang X, Yang S, et al.** Visual field improvement after endoscopic transsphenoidal surgery in patients with pituitary adenoma. *Front Oncol*. 2023;13:1108883.  
+                **DOI:** [10.3389/fonc.2023.1108883](https://doi.org/10.3389/fonc.2023.1108883)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
     
         with tabs[2]: 
@@ -496,7 +499,10 @@ if nav == "🏠 Área de Trabalho":
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
                 
             with st.expander("📚 Referência Científica"):
-                st.markdown("**Sharifi G, Paraandavaji E, et al.** The CuPeR model: A dynamic online tool... *J Clin Transl Endocrinol*. 2025;41:100417.")
+                st.markdown("""
+                **Sharifi G, Paraandavaji E, Akbari Dilmaghani N, et al.** The CuPeR model: A dynamic online tool for predicting Cushing's disease persistence and recurrence after pituitary surgery. *J Clin Transl Endocrinol*. 2025;41:100417.  
+                **DOI:** [10.1016/j.jcte.2025.100417](https://doi.org/10.1016/j.jcte.2025.100417)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[3]: 
@@ -527,6 +533,12 @@ if nav == "🏠 Área de Trabalho":
                         st.markdown(obter_texto_explicativo(contribs))
                         st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
 
+                with st.expander("📚 Referência Científica"):
+                    st.markdown("""
+                    **Cai X, Zhu J, Yang J, et al.** Development and Validation of Nomogram to Preoperatively Predict Intraoperative Cerebrospinal Fluid Leakage in Endoscopic Pituitary Surgery: A Retrospective Cohort Study. *Front Oncol*. 2021;11:719494.  
+                    **DOI:** [10.3389/fonc.2021.719494](https://doi.org/10.3389/fonc.2021.719494)
+                    """)
+
             with sub_tabs_fistula[1]:
                 f1, f2 = st.columns(2)
                 with f1: 
@@ -553,6 +565,12 @@ if nav == "🏠 Área de Trabalho":
                         st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                         st.markdown(obter_texto_explicativo(contribs))
                         st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+                with st.expander("📚 Referência Científica"):
+                    st.markdown("""
+                    **Zhang J, He Y, Ning Y, et al.** Risk factors and predictive model for postoperative cerebrospinal fluid leakage following endoscopic endonasal pituitary adenoma surgery. *Front Endocrinol*. 2025;16:1695573.  
+                    **DOI:** [10.3389/fendo.2025.1695573](https://doi.org/10.3389/fendo.2025.1695573)
+                    """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[4]: 
@@ -585,6 +603,12 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Li XJ, Peng Z, Wang YF, et al.** Analysis of factors influencing the occurrence of diabetes insipidus following neuroendoscopic transsphenoidal resection of pituitary adenomas and risk assessment. *Heliyon*. 2024;10(1):e38694.  
+                **DOI:** [10.1016/j.heliyon.2024.e38694](https://doi.org/10.1016/j.heliyon.2024.e38694)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[5]: 
@@ -621,6 +645,15 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referências Científicas"):
+                st.markdown("""
+                **Cai X, et al.** Predictors and dynamic online nomogram for postoperative delayed hyponatremia after endoscopic transsphenoidal surgery for pituitary adenomas. *Chin Neurosurg J*. 2023;9(1):19.  
+                **DOI:** [10.1186/s41016-023-00334-3](https://doi.org/10.1186/s41016-023-00334-3)
+                
+                **Tan H, et al.** Predictive model of delayed hyponatremia after endoscopic endonasal transsphenoidal resection of pituitary adenoma. *Front Hum Neurosci*. 2025;19:1674519.  
+                **DOI:** [10.3389/fnhum.2025.1674519](https://doi.org/10.3389/fnhum.2025.1674519)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[6]: 
@@ -650,6 +683,12 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Zhou P, Shi J, Long Z, et al.** Predictive model for meningitis after pituitary tumor resection by endoscopic nasal trans-sphenoidal sinus approach. *Eur J Med Res*. 2025;30:738.  
+                **DOI:** [10.1186/s40001-025-03016-1](https://doi.org/10.1186/s40001-025-03016-1)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with tabs[7]: 
@@ -681,6 +720,12 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Chen Y, Cai F, Cao J, et al.** Analysis of Related Factors of Tumor Recurrence or Progression After Transnasal Sphenoidal Surgical Treatment of Large and Giant Pituitary Adenomas and Establish a Nomogram to Predict Tumor Prognosis. *Front Endocrinol*. 2021;12:793337.  
+                **DOI:** [10.3389/fendo.2021.793337](https://doi.org/10.3389/fendo.2021.793337)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with tabs[8]: 
@@ -712,6 +757,12 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Cohen-Cohen S, Rindler R, Botello Hernandez E, et al.** A Novel Preoperative Score to Predict Long-Term Biochemical Remission in Patients with Growth-Hormone Secreting Pituitary Adenomas. *World Neurosurg*. 2024;182:e882-e890.  
+                **DOI:** [10.1016/j.wneu.2023.12.076](https://doi.org/10.1016/j.wneu.2023.12.076)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tabs[9]:
@@ -742,10 +793,16 @@ if nav == "🏠 Área de Trabalho":
                     st.markdown("##### 🧠 Explicabilidade do Algoritmo (XAI)")
                     st.markdown(obter_texto_explicativo(contribs))
                     st.plotly_chart(gerar_grafico_waterfall(contribs), use_container_width=True)
+
+            with st.expander("📚 Referência Científica"):
+                st.markdown("""
+                **Zhong J, Chen Y, Wang M, et al.** Risk factor analysis and prediction model to establish recurrence or progression of non-functioning pituitary adenomas in men after transnasal sphenoidal surgery. *Sci Rep*. 2024;14:21607.  
+                **DOI:** [10.1038/s41598-024-72944-5](https://doi.org/10.1038/s41598-024-72944-5)
+                """)
             st.markdown("</div>", unsafe_allow_html=True)
 
         # =======================================================
-        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA)
+        # PREENCHIMENTO DOS PLACEHOLDERS (ATUALIZAÇÃO DINÂMICA DA BASE DE DADOS)
         # =======================================================
         with painel_placeholder.container():
             st.subheader("📊 Resultados Consolidados e Arquivados")
@@ -774,8 +831,6 @@ if nav == "🏠 Área de Trabalho":
                     
         with relatorio_placeholder.container():
             st.markdown("### 🖨️ Relatório Oficial (Formato A4)")
-            st.info("Clique no botão abaixo para imprimir ou salvar como PDF nativo do sistema. Nas configurações de impressão, ative **'Gráficos de segundo plano / Background graphics'** para manter as cores institucionais do cabeçalho.")
-            
             linhas_html = ""
             df_rel_pac = obter_df_paciente(st.session_state.paciente_ativo['prontuario'])
             
